@@ -30,3 +30,11 @@ pub fn set_wallpaper(image_path: &str) -> Result<(), windows::core::Error> {
         Ok(())
     }
 }
+
+/*
+let image_path = r"C:\wallpaper.jpg";
+match set_wallpaper(image_path) {
+    Ok(_) => println!("Wallpaper set successfully!"),
+    Err(e) => eprintln!("Failed to set wallpaper: {:?}", e),
+}
+*/
