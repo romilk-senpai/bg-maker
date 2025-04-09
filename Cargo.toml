@@ -4,6 +4,8 @@ version = "0.0.1"
 edition = "2018"
 
 [dependencies]
-iced = { version = "0.13.1", features = [ "debug", "canvas", "advanced" ] }
+anyhow = "1.0.97"
+iced = { version = "0.13.1", features = [ "debug", "canvas", "advanced", "image" ] }
+image = "0.25.6"
 rfd = "0.15.3"
 windows = { version = "0.61.1", features = [ "Win32_System_Com", "Win32_UI_Shell" ] }

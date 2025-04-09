@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use iced::{
     advanced::image::Handle,
     mouse,
-    widget::canvas::{self, Frame, Image, Path},
+    widget::canvas::{self, Frame, Path},
     Color, Point, Rectangle, Renderer, Theme,
 };
 
@@ -19,26 +19,30 @@ impl MakerCanvas {
     }
 
     pub fn add_image(&mut self, path: PathBuf) {
-        println!("{}", path.display());
-        /* self.layers.push(Layer {
-            image_path: path.clone(),
-            handle: Handle::from_path(&path),
-            position: Point { x: 0., y: 0. },
-        });
-
-        let image_rect = Rectangle {
-            x: bounds.x,
-            y: bounds.y,
-            width: bounds.width,
-            height: bounds.height,
-        }; */
+        let handle = Handle::from_path(&path);
+        let dimensions_result = image::image_dimensions(&path);
+        match dimensions_result {
+            Ok(dimensions) => {
+                self.layers.push(Layer {
+                    image_path: path.clone(),
+                    image: handle,
+                    rect: Rectangle {
+                        x: 0.,
+                        y: 0.,
+                        width: dimensions.0 as f32,
+                        height: dimensions.1 as f32,
+                    },
+                });
+            }
+            Err(e) => eprintln!("Failed to set wallpaper: {:?}", e),
+        }
     }
 }
 
 struct Layer {
     image_path: PathBuf,
-    handle: Handle,
-    position: Point,
+    image: Handle,
+    rect: Rectangle,
 }
 
 pub enum Interaction {
@@ -65,8 +69,10 @@ impl canvas::Program<Message> for MakerCanvas {
         let mut frame = Frame::new(renderer, bounds.size());
         let background = Path::rectangle(Point::ORIGIN, frame.size());
         frame.fill(&background, Color::from_rgb8(5, 5, 5));
+        for layer in &self.layers {
+            frame.draw_image(layer.rect, &layer.image);
+        }
         let overlay = frame.into_geometry();
-        for layer in &self.layers {}
         vec![overlay]
     }
 

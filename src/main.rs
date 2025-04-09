@@ -1,11 +1,11 @@
-mod marker_canvas;
+mod maker_canvas;
 mod utils;
 
 use iced::keyboard;
 use iced::widget::{button, column, container, row, Canvas};
 use iced::Length::Fill;
 use iced::{Element, Subscription, Task};
-use marker_canvas::MakerCanvas;
+use maker_canvas::MakerCanvas;
 use rfd::AsyncFileDialog;
 
 struct BgMaker {
