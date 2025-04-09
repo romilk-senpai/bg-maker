@@ -5,7 +5,7 @@ use iced::keyboard;
 use iced::widget::{button, column, container, row, Canvas};
 use iced::Length::Fill;
 use iced::{Element, Subscription, Task};
-use maker_canvas::MakerCanvas;
+use maker_canvas::{Id, MakerCanvas};
 use rfd::AsyncFileDialog;
 
 struct BgMaker {
@@ -16,6 +16,7 @@ struct BgMaker {
 enum Message {
     AddImage,
     ImageSelected(Option<std::path::PathBuf>),
+    RemoveImage(Id),
 }
 
 impl BgMaker {
@@ -46,10 +47,14 @@ impl BgMaker {
             }
             Message::ImageSelected(Some(path)) => {
                 // Load the image and update the canvas state
-                self.canvas.add_image(path);
+                self.canvas.add_layer(path);
                 Task::none()
             }
             Message::ImageSelected(None) => Task::none(),
+            Message::RemoveImage(id) => {
+                self.canvas.remove_layer(id);
+                Task::none()
+            }
         }
     }
 
@@ -59,7 +64,7 @@ impl BgMaker {
                 button("Save"),
                 button("Load"),
                 button("Add Image").on_press(Message::AddImage),
-                button("Apply BG")
+                button("Apply BG"),
             ]
             .spacing(4),
             row![
@@ -67,11 +72,16 @@ impl BgMaker {
                     .width(Fill)
                     .height(Fill),
                 container(
-                    column![button("image1").width(Fill), button("image2").width(Fill)]
-                        .width(300)
-                        .height(Fill)
-                        .padding(12)
-                        .spacing(8)
+                    column(self.canvas.get_layers().iter().map(|layer| {
+                        button(layer.get_name().as_str())
+                            .on_press(Message::RemoveImage(layer.get_id()))
+                            .width(Fill)
+                            .into()
+                    }))
+                    .width(300)
+                    .height(Fill)
+                    .padding(12)
+                    .spacing(8)
                 )
             ],
         ]

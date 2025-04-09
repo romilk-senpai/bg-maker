@@ -9,6 +9,26 @@ use iced::{
 
 use crate::Message;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Id(u32);
+
+pub struct Layer {
+    id: Id,
+    name: String,
+    image_path: PathBuf,
+    image: Handle,
+    rect: Rectangle,
+}
+impl Layer {
+    pub fn get_name(&self) -> &String {
+        &self.name
+    }
+
+    pub fn get_id(&self) -> Id {
+        self.id
+    }
+}
+
 pub struct MakerCanvas {
     layers: Vec<Layer>,
 }
@@ -18,13 +38,23 @@ impl MakerCanvas {
         Self { layers: Vec::new() }
     }
 
-    pub fn add_image(&mut self, path: PathBuf) {
-        let handle = Handle::from_path(&path);
-        let dimensions_result = image::image_dimensions(&path);
+    pub fn get_layers(&self) -> &Vec<Layer> {
+        &self.layers
+    }
+
+    pub fn add_layer(&mut self, image_path: PathBuf) {
+        let handle = Handle::from_path(&image_path);
+        let dimensions_result = image::image_dimensions(&image_path);
         match dimensions_result {
             Ok(dimensions) => {
                 self.layers.push(Layer {
-                    image_path: path.clone(),
+                    id: self.layers.last().map_or_else(|| Id(0), |layer| layer.id),
+                    name: image_path
+                        .file_name()
+                        .and_then(|os_str| os_str.to_str())
+                        .unwrap_or_else(|| "default_name")
+                        .to_string(),
+                    image_path: image_path.clone(),
                     image: handle,
                     rect: Rectangle {
                         x: 0.,
@@ -37,12 +67,12 @@ impl MakerCanvas {
             Err(e) => eprintln!("Failed to set wallpaper: {:?}", e),
         }
     }
-}
 
-struct Layer {
-    image_path: PathBuf,
-    image: Handle,
-    rect: Rectangle,
+    pub fn remove_layer(&mut self, id: Id) {
+        if let Some(index) = self.layers.iter().position(|layer| layer.id == id) {
+            self.layers.remove(index);
+        }
+    }
 }
 
 pub enum Interaction {
