@@ -1,11 +1,12 @@
 mod id;
 mod layer_handler;
 mod maker_canvas;
+mod styles;
 mod utils;
 
 use iced::widget::{button, column, container, row, text, Canvas};
 use iced::Length::Fill;
-use iced::{keyboard, Alignment, Length, Padding, Theme};
+use iced::{keyboard, Alignment, Length};
 use iced::{Element, Subscription, Task};
 use id::Id;
 use maker_canvas::MakerCanvas;
@@ -20,6 +21,10 @@ enum Message {
     AddImage,
     ImageSelected(Option<std::path::PathBuf>),
     RemoveImage(Id),
+    ApplyBg,
+    SelectLayer(usize),
+    DeselectLayers,
+    MoveSelection(f32, f32),
 }
 
 impl BgMaker {
@@ -57,6 +62,22 @@ impl BgMaker {
                 self.canvas.remove_layer(id);
                 Task::none()
             }
+            Message::ApplyBg => {
+                self.canvas.apply_bg();
+                Task::none()
+            }
+            Message::SelectLayer(index) => {
+                self.canvas.select_layer(index);
+                Task::none()
+            }
+            Message::MoveSelection(delta_x, delta_y) => {
+                self.canvas.move_selection(delta_x, delta_y);
+                Task::none()
+            }
+            Message::DeselectLayers => {
+                self.canvas.deselect_layers();
+                Task::none()
+            }
         }
     }
 
@@ -66,7 +87,7 @@ impl BgMaker {
                 button("Save"),
                 button("Load"),
                 button("Add Image").on_press(Message::AddImage),
-                button("Apply BG"),
+                button("Apply BG").on_press(Message::ApplyBg),
             ]
             .spacing(4),
             row![
@@ -94,7 +115,11 @@ impl BgMaker {
                             .height(36)
                             .spacing(6),
                         )
-                        .style(container::bordered_box)
+                        .style(if layer.get_is_selected() {
+                            styles::selected_bordered_box
+                        } else {
+                            styles::bordered_box
+                        })
                         .into()
                     }))
                     .padding(1)
