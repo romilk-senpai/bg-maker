@@ -1,11 +1,14 @@
+mod id;
+mod layer_handler;
 mod maker_canvas;
 mod utils;
 
-use iced::keyboard;
-use iced::widget::{button, column, container, row, Canvas};
+use iced::widget::{button, column, container, row, text, Canvas};
 use iced::Length::Fill;
+use iced::{keyboard, Alignment, Length, Padding, Theme};
 use iced::{Element, Subscription, Task};
-use maker_canvas::{Id, MakerCanvas};
+use id::Id;
+use maker_canvas::MakerCanvas;
 use rfd::AsyncFileDialog;
 
 struct BgMaker {
@@ -46,7 +49,6 @@ impl BgMaker {
                 Task::perform(task, Message::ImageSelected)
             }
             Message::ImageSelected(Some(path)) => {
-                // Load the image and update the canvas state
                 self.canvas.add_layer(path);
                 Task::none()
             }
@@ -73,16 +75,33 @@ impl BgMaker {
                     .height(Fill),
                 container(
                     column(self.canvas.get_layers().iter().map(|layer| {
-                        button(layer.get_name().as_str())
-                            .on_press(Message::RemoveImage(layer.get_id()))
-                            .width(Fill)
-                            .into()
+                        container(
+                            row![
+                                layer.get_preview(),
+                                text(layer.get_name()).width(Length::Fill),
+                                button(
+                                    container(text("x").size(16))
+                                        .align_x(Alignment::Center)
+                                        .align_y(Alignment::Center)
+                                )
+                                .on_press(Message::RemoveImage(layer.get_id()))
+                                .height(24)
+                                .width(24)
+                                .padding(0),
+                            ]
+                            .align_y(Alignment::Center)
+                            .padding(4)
+                            .height(36)
+                            .spacing(6),
+                        )
+                        .style(container::bordered_box)
+                        .into()
                     }))
+                    .padding(1)
                     .width(300)
                     .height(Fill)
-                    .padding(12)
-                    .spacing(8)
-                )
+                    .spacing(8),
+                ),
             ],
         ]
         .into()
