@@ -4,9 +4,10 @@ mod maker_canvas;
 mod styles;
 mod utils;
 
-use iced::widget::{button, column, container, row, text, Canvas};
+use iced::widget::container::Style;
+use iced::widget::{button, canvas, column, container, row, text};
 use iced::Length::Fill;
-use iced::{keyboard, Alignment, Length};
+use iced::{keyboard, Alignment, Border, Length};
 use iced::{Element, Subscription, Task};
 use id::Id;
 use maker_canvas::MakerCanvas;
@@ -31,7 +32,7 @@ impl BgMaker {
     fn new() -> (Self, Task<Message>) {
         (
             Self {
-                canvas: MakerCanvas::new(),
+                canvas: MakerCanvas::new(1280., 720.),
             },
             Task::none(),
         )
@@ -91,9 +92,20 @@ impl BgMaker {
             ]
             .spacing(4),
             row![
-                container(Canvas::new(&self.canvas).width(Fill).height(Fill))
-                    .width(Fill)
-                    .height(Fill),
+                container(
+                    canvas::Canvas::new(&self.canvas)
+                        .width(&self.canvas.get_width() * &self.canvas.get_zoom())
+                        .height(&self.canvas.get_height() * &self.canvas.get_zoom())
+                )
+                .style(|theme| {
+                    let palette = theme.extended_palette();
+                    Style {
+                        background: Some(palette.background.weak.color.into()),
+                        ..Style::default()
+                    }
+                })
+                .width(Fill)
+                .height(Fill),
                 container(
                     column(self.canvas.get_layers().iter().map(|layer| {
                         container(
@@ -122,7 +134,6 @@ impl BgMaker {
                         })
                         .into()
                     }))
-                    .padding(1)
                     .width(300)
                     .height(Fill)
                     .spacing(8),

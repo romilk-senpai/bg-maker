@@ -66,15 +66,33 @@ pub struct MakerCanvas {
     layers: Vec<Layer>,
     id_generator: IdGenerator,
     selected_layer: usize,
+    width: f32,
+    height: f32,
+    zoom: f32,
 }
 
 impl MakerCanvas {
-    pub fn new() -> Self {
+    pub fn new(width: f32, height: f32) -> Self {
         Self {
             layers: Vec::new(),
             id_generator: IdGenerator::new(),
             selected_layer: 69420,
+            width,
+            height,
+            zoom: 1.,
         }
+    }
+
+    pub fn get_width(&self) -> f32 {
+        self.width
+    }
+
+    pub fn get_height(&self) -> f32 {
+        self.height
+    }
+
+    pub fn get_zoom(&self) -> f32 {
+        self.zoom
     }
 
     pub fn get_layers(&self) -> &Vec<Layer> {
@@ -147,10 +165,14 @@ impl canvas::Program<Message> for MakerCanvas {
     ) -> Vec<canvas::Geometry> {
         let mut frame = Frame::new(renderer, bounds.size());
         let background = Path::rectangle(Point::ORIGIN, frame.size());
-        frame.fill(&background, Color::from_rgb8(5, 5, 5));
-        for layer in &self.layers {
-            layer.handler.draw(&mut frame);
-        }
+        frame.with_clip(bounds, |mut clipping_frame| {
+            clipping_frame.fill(&background, Color::from_rgb8(24, 24, 28));
+            for layer in &self.layers {
+                layer.handler.draw(&mut clipping_frame);
+            }
+        });
+
+        frame.scale(self.zoom);
         let overlay = frame.into_geometry();
         vec![overlay]
     }
