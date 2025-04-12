@@ -1,11 +1,12 @@
 [package]
 name = "bg-maker"
 version = "0.0.1"
-edition = "2018"
+edition = "2024"
 
 [dependencies]
 anyhow = "1.0.97"
-iced = { version = "0.13.1", features = [ "debug", "canvas", "advanced", "image" ] }
-image = "0.25.6"
-rfd = "0.15.3"
+tokio = "1"
+image = { version= "0.25.6", features = [ "png" ] }
+iced = { version = "0.13.1", features = [ "canvas", "image", "advanced", "tokio" ] }
 windows = { version = "0.61.1", features = [ "Win32_System_Com", "Win32_UI_Shell" ] }
+rfd = "0.15.3"

@@ -1,17 +1,19 @@
 use std::path::PathBuf;
 
 use iced::{
+    Color, Point, Rectangle, Renderer, Theme,
     event::Status,
     mouse,
     widget::canvas::{self, Frame, Path},
-    Color, Point, Renderer, Theme,
+    window::{self, Screenshot},
 };
 
 use layer_handler::{ImageLayer, LayerHandler};
 
 use crate::{
+    Message, PngError,
     id::{Id, IdGenerator},
-    layer_handler, Message,
+    layer_handler,
 };
 
 pub struct Layer {
@@ -138,6 +140,27 @@ impl MakerCanvas {
         }
 
         self.selected_layer = 69420;
+    }
+
+    pub async fn save_to_png(
+        screenshot: Screenshot,
+        rect: Rectangle<u32>,
+    ) -> Result<String, PngError> {
+        let screenshot = screenshot.crop(rect).unwrap();
+        let path = "screenshot.png".to_string();
+        tokio::task::spawn_blocking(move || {
+            image::save_buffer(
+                &path,
+                &screenshot.bytes,
+                screenshot.size.width,
+                screenshot.size.height,
+                image::ColorType::Rgba8,
+            )
+            .map(|_| path)
+            .map_err(|error| PngError(error.to_string()))
+        })
+        .await
+        .expect("Blocking task to finish")
     }
 }
 

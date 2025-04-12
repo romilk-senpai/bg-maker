@@ -4,28 +4,34 @@ mod maker_canvas;
 mod styles;
 mod utils;
 
+use iced::Length::Fill;
 use iced::widget::container::Style;
 use iced::widget::{button, canvas, column, container, row, text};
-use iced::Length::Fill;
-use iced::{keyboard, Alignment, Border, Length};
+use iced::window::Screenshot;
+use iced::{Alignment, Length, Rectangle, keyboard, window};
 use iced::{Element, Subscription, Task};
 use id::Id;
 use maker_canvas::MakerCanvas;
 use rfd::AsyncFileDialog;
 
-struct BgMaker {
-    canvas: MakerCanvas,
-}
+#[derive(Clone, Debug)]
+struct PngError(String);
 
 #[derive(Debug, Clone)]
 enum Message {
     AddImage,
     ImageSelected(Option<std::path::PathBuf>),
     RemoveImage(Id),
-    ApplyBg,
+    SaveAsPng,
+    Screenshotted(Screenshot),
+    PngSaved(Result<String, PngError>),
     SelectLayer(usize),
     DeselectLayers,
     MoveSelection(f32, f32),
+}
+
+struct BgMaker {
+    canvas: MakerCanvas,
 }
 
 impl BgMaker {
@@ -52,43 +58,61 @@ impl BgMaker {
                         .await;
                     file.map(|f| f.path().to_path_buf())
                 };
-                Task::perform(task, Message::ImageSelected)
+                return Task::perform(task, Message::ImageSelected);
             }
             Message::ImageSelected(Some(path)) => {
                 self.canvas.add_layer(path);
-                Task::none()
             }
-            Message::ImageSelected(None) => Task::none(),
+            Message::ImageSelected(None) => {}
             Message::RemoveImage(id) => {
                 self.canvas.remove_layer(id);
-                Task::none()
             }
-            Message::ApplyBg => {
+            Message::SaveAsPng => {
                 self.canvas.apply_bg();
-                Task::none()
+                return window::get_latest()
+                    .and_then(window::screenshot)
+                    .map(Message::Screenshotted);
             }
+            Message::Screenshotted(screenshot) => {
+                return Task::perform(
+                    MakerCanvas::save_to_png(
+                        screenshot,
+                        Rectangle {
+                            x: 0,
+                            y: 0,
+                            width: self.canvas.get_width() as u32,
+                            height: self.canvas.get_height() as u32,
+                        },
+                    ),
+                    Message::PngSaved,
+                );
+            }
+            Message::PngSaved(result) => match result {
+                Ok(path) => println!("Saved screenshot to: {}", path),
+                Err(e) => eprintln!("Failed to save screenshot: {}", e.0),
+            },
             Message::SelectLayer(index) => {
                 self.canvas.select_layer(index);
-                Task::none()
             }
             Message::MoveSelection(delta_x, delta_y) => {
                 self.canvas.move_selection(delta_x, delta_y);
-                Task::none()
             }
             Message::DeselectLayers => {
                 self.canvas.deselect_layers();
-                Task::none()
             }
         }
+
+        Task::none()
     }
 
     fn view(&self) -> Element<Message> {
         column![
             row![
-                button("Save"),
-                button("Load"),
+                button("Save project"),
+                button("Load project"),
                 button("Add Image").on_press(Message::AddImage),
-                button("Apply BG").on_press(Message::ApplyBg),
+                button("Export to PNG").on_press(Message::SaveAsPng),
+                button("Save & Apply"),
             ]
             .spacing(4),
             row![
@@ -144,8 +168,8 @@ impl BgMaker {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        keyboard::on_key_press(|key, modifiers| {
-            let keyboard::Key::Named(key) = key else {
+        keyboard::on_key_press(|key, _modifiers| {
+            let keyboard::Key::Named(_key) = key else {
                 return None;
             };
 
