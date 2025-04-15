@@ -8,6 +8,7 @@ use windows::{
     },
 };
 
+#[allow(dead_code)]
 pub fn set_wallpaper(image_path: &str) -> Result<(), windows::core::Error> {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);

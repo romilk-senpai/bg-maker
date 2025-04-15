@@ -7,6 +7,7 @@ edition = "2024"
 anyhow = "1.0.97"
 tokio = "1"
 image = { version= "0.25.6", features = [ "png" ] }
-iced = { version = "0.13.1", features = [ "canvas", "image", "advanced", "tokio" ] }
+# iced = { version = "0.13.1", features = [ "canvas", "image", "advanced", "tokio" ] }
+iced = { path = "C:/Projects/bg_maker_root/iced", features = [ "canvas", "image", "advanced", "tokio" ] }
 windows = { version = "0.61.1", features = [ "Win32_System_Com", "Win32_UI_Shell" ] }
 rfd = "0.15.3"

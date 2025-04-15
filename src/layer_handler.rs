@@ -21,7 +21,6 @@ pub trait LayerHandler: 'static {
 }
 
 pub struct ImageLayer {
-    image_path: PathBuf,
     handle: Handle,
     rect: Rectangle,
     is_selected: bool,
@@ -40,7 +39,6 @@ impl ImageLayer {
         };
 
         Self {
-            image_path,
             handle,
             rect,
             is_selected: false,

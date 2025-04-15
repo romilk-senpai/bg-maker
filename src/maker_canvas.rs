@@ -5,7 +5,7 @@ use iced::{
     event::Status,
     mouse,
     widget::canvas::{self, Frame, Path},
-    window::{self, Screenshot},
+    window::Screenshot,
 };
 
 use layer_handler::{ImageLayer, LayerHandler};
@@ -144,10 +144,10 @@ impl MakerCanvas {
 
     pub async fn save_to_png(
         screenshot: Screenshot,
-        rect: Rectangle<u32>,
+        _rect: Rectangle<u32>,
     ) -> Result<String, PngError> {
-        let screenshot = screenshot.crop(rect).unwrap();
-        let path = "screenshot.png".to_string();
+        // let screenshot = screenshot.crop(rect).unwrap();
+        let path = "screenshot1.png".to_string();
         tokio::task::spawn_blocking(move || {
             image::save_buffer(
                 &path,
