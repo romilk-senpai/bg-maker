@@ -179,7 +179,8 @@ impl BgMaker {
 }
 
 fn main() -> iced::Result {
-    iced::application(BgMaker::title, BgMaker::update, BgMaker::view)
+    iced::application(BgMaker::new, BgMaker::update, BgMaker::view)
         .subscription(BgMaker::subscription)
-        .run_with(BgMaker::new)
+        .title(BgMaker::title)
+        .run()
 }

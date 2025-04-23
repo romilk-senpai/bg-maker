@@ -1,9 +1,7 @@
 use std::path::PathBuf;
 
 use iced::{
-    Color, Point, Rectangle, Renderer, Theme,
-    event::Status,
-    mouse,
+    Color, Point, Rectangle, Renderer, Theme, mouse,
     widget::canvas::{self, Frame, Path},
     window::Screenshot,
 };
@@ -202,16 +200,16 @@ impl canvas::Program<Message> for MakerCanvas {
 
     fn update(
         &self,
-        state: &mut Self::State,
-        event: canvas::Event,
+        state: &mut Interaction,
+        event: &canvas::Event,
         _bounds: iced::Rectangle,
         cursor: mouse::Cursor,
-    ) -> (Status, Option<Message>) {
+    ) -> Option<canvas::Action<Message>> {
         match event {
             canvas::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
                 let cursor_position = match cursor.position() {
                     Some(pos) => pos,
-                    None => return (Status::Ignored, None),
+                    None => return None,
                 };
 
                 for (index, layer) in self.layers.iter().enumerate().rev() {
@@ -224,32 +222,32 @@ impl canvas::Program<Message> for MakerCanvas {
                         *state = Interaction::Dragging {
                             position: cursor_position,
                         };
-                        return (Status::Captured, None);
+                        return None;
                     } else {
-                        return (Status::Captured, Some(Message::SelectLayer(index)));
+                        return Some(canvas::Action::publish(Message::SelectLayer(index)));
                     }
                 }
 
-                return (Status::Captured, Some(Message::DeselectLayers));
+                return Some(canvas::Action::publish(Message::DeselectLayers));
             }
 
             canvas::Event::Mouse(mouse::Event::CursorMoved { position }) => {
                 if let Interaction::Dragging { position: offset } = *state {
                     let delta = Point::new(position.x - offset.x, position.y - offset.y);
+                    let position = position.to_owned();
                     *state = Interaction::Dragging { position };
-                    return (
-                        Status::Captured,
-                        Some(Message::MoveSelection(delta.x, delta.y)),
-                    );
+                    return Some(canvas::Action::publish(Message::MoveSelection(
+                        delta.x, delta.y,
+                    )));
                 }
             }
             canvas::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
                 *state = Interaction::None;
-                return (Status::Captured, None);
+                return None;
             }
             _ => {}
         }
-        (Status::Ignored, None)
+        None
     }
 
     fn mouse_interaction(
