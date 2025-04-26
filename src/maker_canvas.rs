@@ -1,9 +1,8 @@
 use std::path::PathBuf;
 
 use iced::{
-    Color, Point, Rectangle, Renderer, Theme, mouse,
+    Color, Element, Point, Rectangle, Renderer, Size, Theme, mouse,
     widget::canvas::{self, Frame, Path},
-    window::Screenshot,
 };
 
 use layer_handler::{ImageLayer, LayerHandler};
@@ -12,6 +11,7 @@ use crate::{
     Message, PngError,
     id::{Id, IdGenerator},
     layer_handler,
+    simulator::Simulator,
 };
 
 pub struct Layer {
@@ -83,16 +83,12 @@ impl MakerCanvas {
         }
     }
 
-    pub fn get_width(&self) -> f32 {
-        self.width
-    }
+    pub fn view(&self) -> Element<Message> {
+        let canvas = canvas::Canvas::new(self)
+            .width(self.width * self.zoom)
+            .height(self.height * self.zoom);
 
-    pub fn get_height(&self) -> f32 {
-        self.height
-    }
-
-    pub fn get_zoom(&self) -> f32 {
-        self.zoom
+        canvas.into()
     }
 
     pub fn get_layers(&self) -> &Vec<Layer> {
@@ -140,25 +136,31 @@ impl MakerCanvas {
         self.selected_layer = 69420;
     }
 
-    pub async fn save_to_png(
-        screenshot: Screenshot,
-        _rect: Rectangle<u32>,
-    ) -> Result<String, PngError> {
-        // let screenshot = screenshot.crop(rect).unwrap();
-        let path = "screenshot1.png".to_string();
-        tokio::task::spawn_blocking(move || {
-            image::save_buffer(
-                &path,
-                &screenshot.bytes,
-                screenshot.size.width,
-                screenshot.size.height,
-                image::ColorType::Rgba8,
+    pub fn render_sim(&self, simulator: &mut Simulator) {
+        let scale_factor = 2.0;
+        let screenshot = simulator
+            .screenshot(
+                self.view(),
+                Size {
+                    width: self.width,
+                    height: self.height,
+                },
+                scale_factor,
             )
-            .map(|_| path)
-            .map_err(|error| PngError(error.to_string()))
-        })
-        .await
-        .expect("Blocking task to finish")
+            .unwrap();
+
+        let now = chrono::Local::now();
+        let path = format!("image-{}.png", now.format("%Y-%m-%d_%H-%M-%S"));
+
+        let _ = image::save_buffer(
+            &path,
+            &screenshot.bytes,
+            screenshot.size.width,
+            screenshot.size.height,
+            image::ColorType::Rgba8,
+        )
+        .map(|_| path)
+        .map_err(|error| PngError(error.to_string()));
     }
 }
 
@@ -186,7 +188,7 @@ impl canvas::Program<Message> for MakerCanvas {
     ) -> Vec<canvas::Geometry> {
         let mut frame = Frame::new(renderer, bounds.size());
         let background = Path::rectangle(Point::ORIGIN, frame.size());
-        frame.with_clip(bounds, |mut clipping_frame| {
+        frame.with_clip(Rectangle::with_size(bounds.size()), |mut clipping_frame| {
             clipping_frame.fill(&background, Color::from_rgb8(24, 24, 28));
             for layer in &self.layers {
                 layer.handler.draw(&mut clipping_frame);
@@ -202,19 +204,24 @@ impl canvas::Program<Message> for MakerCanvas {
         &self,
         state: &mut Interaction,
         event: &canvas::Event,
-        _bounds: iced::Rectangle,
+        bounds: iced::Rectangle,
         cursor: mouse::Cursor,
     ) -> Option<canvas::Action<Message>> {
         match event {
             canvas::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
                 let cursor_position = match cursor.position() {
-                    Some(pos) => pos,
+                    Some(pos) => Point { x: pos.x, y: pos.y },
                     None => return None,
+                };
+
+                let in_cursor_position = Point {
+                    x: cursor_position.x - bounds.x,
+                    y: cursor_position.y - bounds.y,
                 };
 
                 for (index, layer) in self.layers.iter().enumerate().rev() {
                     let rect = layer.handler.get_rect();
-                    if !rect.contains(cursor_position) {
+                    if !rect.contains(in_cursor_position) {
                         continue;
                     }
 

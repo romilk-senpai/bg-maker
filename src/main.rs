@@ -1,18 +1,19 @@
 mod id;
 mod layer_handler;
 mod maker_canvas;
+mod simulator;
 mod styles;
 mod utils;
 
 use iced::Length::Fill;
 use iced::widget::container::Style;
-use iced::widget::{button, canvas, column, container, row, text};
-use iced::window::Screenshot;
-use iced::{Alignment, Length, Rectangle, keyboard, window};
+use iced::widget::{button, column, container, row, text};
+use iced::{Alignment, Length, keyboard};
 use iced::{Element, Subscription, Task};
 use id::Id;
 use maker_canvas::MakerCanvas;
 use rfd::AsyncFileDialog;
+use simulator::Simulator;
 
 #[derive(Clone, Debug)]
 struct PngError(String);
@@ -23,8 +24,6 @@ enum Message {
     ImageSelected(Option<std::path::PathBuf>),
     RemoveImage(Id),
     SaveAsPng,
-    Screenshotted(Screenshot),
-    PngSaved(Result<String, PngError>),
     SelectLayer(usize),
     DeselectLayers,
     MoveSelection(f32, f32),
@@ -32,6 +31,7 @@ enum Message {
 
 struct BgMaker {
     canvas: MakerCanvas,
+    simulator: Simulator,
 }
 
 impl BgMaker {
@@ -39,6 +39,7 @@ impl BgMaker {
         (
             Self {
                 canvas: MakerCanvas::new(1280., 720.),
+                simulator: Simulator::new(),
             },
             Task::none(),
         )
@@ -68,29 +69,8 @@ impl BgMaker {
                 self.canvas.remove_layer(id);
             }
             Message::SaveAsPng => {
-                self.canvas.apply_bg();
-                return window::get_latest()
-                    .and_then(window::screenshot)
-                    .map(Message::Screenshotted);
+                self.canvas.render_sim(&mut self.simulator);
             }
-            Message::Screenshotted(screenshot) => {
-                return Task::perform(
-                    MakerCanvas::save_to_png(
-                        screenshot,
-                        Rectangle {
-                            x: 0,
-                            y: 0,
-                            width: self.canvas.get_width() as u32,
-                            height: self.canvas.get_height() as u32,
-                        },
-                    ),
-                    Message::PngSaved,
-                );
-            }
-            Message::PngSaved(result) => match result {
-                Ok(path) => println!("Saved screenshot to: {}", path),
-                Err(e) => eprintln!("Failed to save screenshot: {}", e.0),
-            },
             Message::SelectLayer(index) => {
                 self.canvas.select_layer(index);
             }
@@ -116,20 +96,16 @@ impl BgMaker {
             ]
             .spacing(4),
             row![
-                container(
-                    canvas::Canvas::new(&self.canvas)
-                        .width(&self.canvas.get_width() * &self.canvas.get_zoom())
-                        .height(&self.canvas.get_height() * &self.canvas.get_zoom())
-                )
-                .style(|theme| {
-                    let palette = theme.extended_palette();
-                    Style {
-                        background: Some(palette.background.weak.color.into()),
-                        ..Style::default()
-                    }
-                })
-                .width(Fill)
-                .height(Fill),
+                container(self.canvas.view())
+                    .style(|theme| {
+                        let palette = theme.extended_palette();
+                        Style {
+                            background: Some(palette.background.weak.color.into()),
+                            ..Style::default()
+                        }
+                    })
+                    .width(Fill)
+                    .height(Fill),
                 container(
                     column(self.canvas.get_layers().iter().map(|layer| {
                         container(
