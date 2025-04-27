@@ -3,6 +3,12 @@ name = "bg-maker"
 version = "0.0.1"
 edition = "2024"
 
+[lib]
+crate-type = ["cdylib"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61.1", features = [ "Win32_System_Com", "Win32_UI_Shell" ] }
 
@@ -11,6 +17,5 @@ tokio = "1"
 image = { version= "0.25.6", features = [ "png" ] }
 iced = { git = "https://github.com/iced-rs/iced.git", features = [ "canvas", "image", "advanced", "tokio" ], branch = "master" }
 iced_runtime = { git = "https://github.com/iced-rs/iced.git", branch = "master" }
-windows = { version = "0.61.1", features = [ "Win32_System_Com", "Win32_UI_Shell" ] }
 rfd = "0.15.3"
 chrono = "0.4.40"

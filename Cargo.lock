@@ -447,6 +447,7 @@ dependencies = [
  "image",
  "rfd",
  "tokio",
+ "wasm-bindgen",
  "windows 0.61.1",
 ]
 

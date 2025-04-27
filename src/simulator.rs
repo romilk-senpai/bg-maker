@@ -33,10 +33,20 @@ use std::env;
 
 use iced::Theme;
 
-/// A simulator that can take screenshots of `iced`` user interfaces
+#[cfg(not(target_arch = "wasm32"))]
 pub struct Simulator<R = iced::Renderer>
 where
     R: renderer::Renderer + Headless + Send,
+{
+    renderer: R,
+    cursor: mouse::Cursor,
+    theme: Theme,
+}
+
+#[cfg(target_arch = "wasm32")]
+pub struct Simulator<R = iced::Renderer>
+where
+    R: renderer::Renderer + Headless,
 {
     renderer: R,
     cursor: mouse::Cursor,

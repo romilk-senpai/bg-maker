@@ -8,11 +8,7 @@ use iced::{
 use layer_handler::ImageLayer;
 
 use crate::{
-    Message, PngError,
-    id::{Id, IdGenerator},
-    layer::Layer,
-    layer_handler,
-    simulator::Simulator,
+    bg_maker::{Message, PngError}, id::{Id, IdGenerator}, layer::Layer, layer_handler, simulator::Simulator
 };
 
 pub struct MakerCanvas {

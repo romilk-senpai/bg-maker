@@ -9,7 +9,7 @@ use iced::{
     widget::canvas::{Frame, Stroke},
 };
 
-use crate::Message;
+use crate::bg_maker::Message;
 
 pub trait LayerHandler: 'static {
     fn get_preview(&self) -> Element<Message>;
