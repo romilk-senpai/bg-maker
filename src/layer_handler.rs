@@ -71,7 +71,7 @@ impl LayerHandler for ImageLayer {
             frame.stroke(
                 &path,
                 Stroke {
-                    width: 4.0,
+                    width: 3.0,
                     style: Style::Solid(Color::from_rgb(1., 0., 0.)),
                     ..Stroke::default()
                 },

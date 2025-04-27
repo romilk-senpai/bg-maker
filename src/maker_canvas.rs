@@ -257,9 +257,75 @@ impl canvas::Program<Message> for MakerCanvas {
     fn mouse_interaction(
         &self,
         _state: &Self::State,
-        _bounds: iced::Rectangle,
-        _cursor: mouse::Cursor,
+        bounds: iced::Rectangle,
+        cursor: mouse::Cursor,
     ) -> mouse::Interaction {
+        if self.selected_layer != 69420 {
+            let cursor_position = match cursor.position() {
+                Some(pos) => Point { x: pos.x, y: pos.y },
+                None => return mouse::Interaction::default(),
+            };
+
+            let in_cursor_position = Point {
+                x: cursor_position.x - bounds.x,
+                y: cursor_position.y - bounds.y,
+            };
+
+            let layer_rect = self.layers[self.selected_layer].handler.get_rect();
+
+            let (near_left, near_right, near_top, near_bottom) =
+                cursor_in_resize_bounds(in_cursor_position, &layer_rect, 4.);
+
+            return get_cursor_type(
+                in_cursor_position,
+                &layer_rect,
+                near_left,
+                near_right,
+                near_top,
+                near_bottom,
+            );
+        }
+
+        mouse::Interaction::default()
+    }
+}
+
+fn cursor_in_resize_bounds(
+    cursor_position: Point,
+    bounds: &Rectangle,
+    threshold: f32,
+) -> (bool, bool, bool, bool) {
+    let near_left =
+        cursor_position.x > bounds.x - threshold && cursor_position.x < bounds.x + threshold;
+    let near_right = cursor_position.x > bounds.x + bounds.width - threshold
+        && cursor_position.x < bounds.x + bounds.width + threshold;
+    let near_top =
+        cursor_position.y > bounds.y - threshold && cursor_position.y < bounds.y + threshold;
+    let near_bottom = cursor_position.y > bounds.y + bounds.height - threshold
+        && cursor_position.y < bounds.y + bounds.height + threshold;
+
+    (near_left, near_right, near_top, near_bottom)
+}
+
+fn get_cursor_type(
+    cursor_position: Point,
+    bounds: &Rectangle,
+    near_left: bool,
+    near_right: bool,
+    near_top: bool,
+    near_bottom: bool,
+) -> mouse::Interaction {
+    if near_left && near_top || near_right && near_bottom {
+        mouse::Interaction::ResizingDiagonallyDown
+    } else if near_left && near_bottom || near_right && near_top {
+        mouse::Interaction::ResizingDiagonallyUp
+    } else if near_left || near_right {
+        mouse::Interaction::ResizingHorizontally
+    } else if near_top || near_bottom {
+        mouse::Interaction::ResizingVertically
+    } else if bounds.contains(cursor_position) {
+        mouse::Interaction::Move
+    } else {
         mouse::Interaction::default()
     }
 }
