@@ -72,22 +72,28 @@ impl Layer {
         let effective_delta_x = delta_x * (1. - 2. * pivot.x);
         let effective_delta_y = delta_y * (1. - 2. * pivot.y);
 
-        let new_width: f32;
-        let new_height: f32;
+        let mut new_width: f32;
+        let mut new_height: f32;
 
         if preserve_aspect {
-            new_width = width + effective_delta_x;
-            new_height = height + effective_delta_y;
+            let scale_x = (width + effective_delta_x) / width;
+            new_width = width * scale_x;
+            new_height = height * scale_x;
         } else {
             new_width = width + effective_delta_x;
             new_height = height + effective_delta_y;
         };
 
-        rect.x -= (new_width - width) * pivot.x;
-        rect.y -= (new_height - height) * pivot.y;
+        if new_width < 16. || new_height < 16. {
+            new_width = new_width.max(16.);
+            new_height = new_height.max(16.);
+        } else {
+            rect.x -= (new_width - width) * pivot.x;
+            rect.y -= (new_height - height) * pivot.y;
+        }
 
-        rect.width = new_width;
         rect.height = new_height;
+        rect.width = new_width;
 
         self.handler.set_rect(rect);
     }
@@ -263,13 +269,14 @@ impl canvas::Program<Message> for MakerCanvas {
                 if self.selected_layer != 69420 {
                     let layer_rect = self.layers[self.selected_layer].handler.get_rect();
                     let (near_left, near_right, near_top, near_bottom) =
-                        cursor_in_resize_bounds(in_cursor_position, &layer_rect, 4.);
+                        cursor_to_pivot(in_cursor_position, &layer_rect, 4.);
 
                     if near_left || near_right || near_top || near_bottom {
                         let pivot = Point::new(
                             if near_left { 1. } else { 0. },
                             if near_top { 1. } else { 0. },
                         );
+
                         *state = Interaction::Resizing { position, pivot };
                         return None;
                     }
@@ -311,7 +318,7 @@ impl canvas::Program<Message> for MakerCanvas {
                     let delta = Point::new(position.x - offset.x, position.y - offset.y);
                     let position = position.to_owned();
                     *state = Interaction::Resizing { position, pivot };
-                    let preserve_aspect = true;
+                    let preserve_aspect = false;
                     return Some(canvas::Action::publish(Message::ResizeSelection(
                         delta.x,
                         delta.y,
@@ -350,9 +357,9 @@ impl canvas::Program<Message> for MakerCanvas {
             let layer_rect = self.layers[self.selected_layer].handler.get_rect();
 
             let (near_left, near_right, near_top, near_bottom) =
-                cursor_in_resize_bounds(in_cursor_position, &layer_rect, 4.);
+                cursor_to_pivot(in_cursor_position, &layer_rect, 4.);
 
-            return get_cursor_type(
+            return get_cursor_type_from_rect(
                 in_cursor_position,
                 &layer_rect,
                 near_left,
@@ -366,7 +373,7 @@ impl canvas::Program<Message> for MakerCanvas {
     }
 }
 
-fn cursor_in_resize_bounds(
+fn cursor_to_pivot(
     cursor_position: Point,
     bounds: &Rectangle,
     threshold: f32,
@@ -383,7 +390,7 @@ fn cursor_in_resize_bounds(
     (near_left, near_right, near_top, near_bottom)
 }
 
-fn get_cursor_type(
+fn get_cursor_type_from_rect(
     cursor_position: Point,
     bounds: &Rectangle,
     near_left: bool,
