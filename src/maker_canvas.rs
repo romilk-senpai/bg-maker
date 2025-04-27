@@ -5,107 +5,24 @@ use iced::{
     widget::canvas::{self, Frame, Path},
 };
 
-use layer_handler::{ImageLayer, LayerHandler};
+use layer_handler::ImageLayer;
 
 use crate::{
     Message, PngError,
     id::{Id, IdGenerator},
+    layer::Layer,
     layer_handler,
     simulator::Simulator,
 };
 
-pub struct Layer {
-    id: Id,
-    name: String,
-    handler: Box<dyn LayerHandler>,
-    is_selected: bool,
-}
-
-impl Layer {
-    pub fn new(id: Id, name: String, handler: Box<dyn LayerHandler>) -> Self {
-        Self {
-            id,
-            name,
-            handler,
-            is_selected: false,
-        }
-    }
-
-    pub fn get_name(&self) -> &String {
-        &self.name
-    }
-
-    pub fn get_id(&self) -> Id {
-        self.id
-    }
-
-    pub fn get_is_selected(&self) -> bool {
-        self.is_selected
-    }
-
-    pub fn get_preview(&self) -> iced::Element<Message> {
-        self.handler.get_preview()
-    }
-
-    fn move_by(&mut self, x: f32, y: f32) {
-        let mut rect = self.handler.get_rect();
-        rect.x += x;
-        rect.y += y;
-        self.handler.set_rect(rect);
-    }
-
-    fn on_select(&mut self) {
-        self.is_selected = true;
-        self.handler.on_select();
-    }
-
-    fn on_deselect(&mut self) {
-        self.handler.on_deselect();
-        self.is_selected = false;
-    }
-
-    fn resize_by(&mut self, delta_x: f32, delta_y: f32, pivot: Point, preserve_aspect: bool) {
-        let mut rect = self.handler.get_rect();
-        let width = rect.width;
-        let height = rect.height;
-
-        let effective_delta_x = delta_x * (1. - 2. * pivot.x);
-        let effective_delta_y = delta_y * (1. - 2. * pivot.y);
-
-        let mut new_width: f32;
-        let mut new_height: f32;
-
-        if preserve_aspect {
-            let scale_x = (width + effective_delta_x) / width;
-            new_width = width * scale_x;
-            new_height = height * scale_x;
-        } else {
-            new_width = width + effective_delta_x;
-            new_height = height + effective_delta_y;
-        };
-
-        if new_width < 16. || new_height < 16. {
-            new_width = new_width.max(16.);
-            new_height = new_height.max(16.);
-        } else {
-            rect.x -= (new_width - width) * pivot.x;
-            rect.y -= (new_height - height) * pivot.y;
-        }
-
-        rect.height = new_height;
-        rect.width = new_width;
-
-        self.handler.set_rect(rect);
-    }
-}
-
 pub struct MakerCanvas {
-    layers: Vec<Layer>,
+    pub layers: Vec<Layer>,
     id_generator: IdGenerator,
     selected_layer: usize,
     width: f32,
     height: f32,
     zoom: f32,
+    shift_held: bool,
 }
 
 impl MakerCanvas {
@@ -117,6 +34,7 @@ impl MakerCanvas {
             width,
             height,
             zoom: 1.,
+            shift_held: false,
         }
     }
 
@@ -126,10 +44,6 @@ impl MakerCanvas {
             .height(self.height * self.zoom);
 
         canvas.into()
-    }
-
-    pub fn get_layers(&self) -> &Vec<Layer> {
-        &self.layers
     }
 
     pub fn add_layer(&mut self, image_path: PathBuf) {
@@ -208,6 +122,10 @@ impl MakerCanvas {
         .map(|_| path)
         .map_err(|error| PngError(error.to_string()));
     }
+
+    pub fn set_shift_state(&mut self, held: bool) {
+        self.shift_held = held;
+    }
 }
 
 pub enum Interaction {
@@ -238,7 +156,7 @@ impl canvas::Program<Message> for MakerCanvas {
         frame.with_clip(Rectangle::with_size(bounds.size()), |mut clipping_frame| {
             clipping_frame.fill(&background, Color::from_rgb8(24, 24, 28));
             for layer in &self.layers {
-                layer.handler.draw(&mut clipping_frame);
+                layer.draw(&mut clipping_frame);
             }
         });
 
@@ -314,7 +232,7 @@ impl canvas::Program<Message> for MakerCanvas {
                     let delta = Point::new(position.x - offset.x, position.y - offset.y);
                     let position = position.to_owned();
                     *state = Interaction::Resizing { position, pivot };
-                    let preserve_aspect = true;
+                    let preserve_aspect = self.shift_held;
                     return Some(canvas::Action::publish(Message::ResizeSelection(
                         delta.x,
                         delta.y,

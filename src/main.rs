@@ -1,4 +1,5 @@
 mod id;
+mod layer;
 mod layer_handler;
 mod maker_canvas;
 mod simulator;
@@ -31,6 +32,9 @@ enum Message {
     MoveSelection(f32, f32),
     SavePathSelected(Option<PathBuf>),
     ResizeSelection(f32, f32, Point, bool),
+    ShiftHeld(bool),
+    Undo,
+    Redo,
 }
 
 struct BgMaker {
@@ -103,6 +107,12 @@ impl BgMaker {
                 return Task::none();
             }
             Message::SavePathSelected(None) => return Task::none(),
+            Message::ShiftHeld(held) => {
+                self.canvas.set_shift_state(held);
+                return Task::none();
+            }
+            Message::Undo => todo!(),
+            Message::Redo => todo!(),
         }
 
         Task::none()
@@ -130,17 +140,17 @@ impl BgMaker {
                     .width(Fill)
                     .height(Fill),
                 container(
-                    column(self.canvas.get_layers().iter().map(|layer| {
+                    column(self.canvas.layers.iter().map(|layer| {
                         container(
                             row![
-                                layer.get_preview(),
+                                layer.handler.get_preview(),
                                 text(layer.get_name()).width(Length::Fill),
                                 button(
                                     container(text("x").size(16))
                                         .align_x(Alignment::Center)
                                         .align_y(Alignment::Center)
                                 )
-                                .on_press(Message::RemoveImage(layer.get_id()))
+                                .on_press(Message::RemoveImage(layer.id))
                                 .height(24)
                                 .width(24)
                                 .padding(0),
@@ -150,7 +160,7 @@ impl BgMaker {
                             .height(36)
                             .spacing(6),
                         )
-                        .style(if layer.get_is_selected() {
+                        .style(if layer.is_selected {
                             styles::selected_bordered_box
                         } else {
                             styles::bordered_box
@@ -167,13 +177,35 @@ impl BgMaker {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        keyboard::on_key_press(|key, _modifiers| {
-            let keyboard::Key::Named(_key) = key else {
-                return None;
-            };
+        let press = keyboard::on_key_press(|key, modifiers| handle_hotkey_pressed(key, modifiers));
+        let release =
+            keyboard::on_key_release(|key, modifiers| handle_hotkey_release(key, modifiers));
 
-            None
-        })
+        Subscription::batch(vec![press, release])
+    }
+}
+
+fn handle_hotkey_pressed(key: keyboard::Key, modifiers: keyboard::Modifiers) -> Option<Message> {
+    use keyboard::key::{self, Key};
+    match key.as_ref() {
+        Key::Character("z") if modifiers.command() && modifiers.shift() => Some(Message::Redo),
+        Key::Character("z") if modifiers.command() => Some(Message::Undo),
+        Key::Named(key) => match key {
+            key::Named::Shift => Some(Message::ShiftHeld(true)),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn handle_hotkey_release(key: keyboard::Key, _modifiers: keyboard::Modifiers) -> Option<Message> {
+    use keyboard::key::{self, Key};
+    match key.as_ref() {
+        Key::Named(key) => match key {
+            key::Named::Shift => Some(Message::ShiftHeld(false)),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
