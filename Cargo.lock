@@ -441,7 +441,6 @@ dependencies = [
 name = "bg-maker"
 version = "0.0.1"
 dependencies = [
- "anyhow",
  "chrono",
  "iced",
  "iced_runtime",

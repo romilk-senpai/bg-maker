@@ -7,7 +7,6 @@ edition = "2024"
 windows = { version = "0.61.1", features = [ "Win32_System_Com", "Win32_UI_Shell" ] }
 
 [dependencies]
-anyhow = "1.0.97"
 tokio = "1"
 image = { version= "0.25.6", features = [ "png" ] }
 iced = { git = "https://github.com/iced-rs/iced.git", features = [ "canvas", "image", "advanced", "tokio" ], branch = "master" }
