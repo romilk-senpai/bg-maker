@@ -268,17 +268,13 @@ impl canvas::Program<Message> for MakerCanvas {
 
                 if self.selected_layer != 69420 {
                     let layer_rect = self.layers[self.selected_layer].handler.get_rect();
-                    let (near_left, near_right, near_top, near_bottom) =
-                        cursor_to_pivot(in_cursor_position, &layer_rect, 4.);
 
-                    if near_left || near_right || near_top || near_bottom {
-                        let pivot = Point::new(
-                            if near_left { 1. } else { 0. },
-                            if near_top { 1. } else { 0. },
-                        );
-
-                        *state = Interaction::Resizing { position, pivot };
-                        return None;
+                    match position_to_pivot(in_cursor_position, &layer_rect, 4.) {
+                        Some(pivot) => {
+                            *state = Interaction::Resizing { position, pivot };
+                            return None;
+                        }
+                        None => {}
                     }
                 }
 
@@ -318,7 +314,7 @@ impl canvas::Program<Message> for MakerCanvas {
                     let delta = Point::new(position.x - offset.x, position.y - offset.y);
                     let position = position.to_owned();
                     *state = Interaction::Resizing { position, pivot };
-                    let preserve_aspect = false;
+                    let preserve_aspect = true;
                     return Some(canvas::Action::publish(Message::ResizeSelection(
                         delta.x,
                         delta.y,
@@ -339,73 +335,83 @@ impl canvas::Program<Message> for MakerCanvas {
 
     fn mouse_interaction(
         &self,
-        _state: &Self::State,
+        state: &Self::State,
         bounds: iced::Rectangle,
         cursor: mouse::Cursor,
     ) -> mouse::Interaction {
-        if self.selected_layer != 69420 {
-            let cursor_position = match cursor.position() {
-                Some(pos) => Point { x: pos.x, y: pos.y },
-                None => return mouse::Interaction::default(),
-            };
+        match *state {
+            Interaction::Dragging { position: _ } => return mouse::Interaction::Move,
+            Interaction::Resizing { position, pivot } => {
+                return pivot_to_cursor(position, &bounds, Some(pivot));
+            }
+            Interaction::None => {
+                if self.selected_layer != 69420 {
+                    let cursor_position = match cursor.position() {
+                        Some(pos) => Point { x: pos.x, y: pos.y },
+                        None => return mouse::Interaction::default(),
+                    };
 
-            let in_cursor_position = Point {
-                x: cursor_position.x - bounds.x,
-                y: cursor_position.y - bounds.y,
-            };
+                    let in_cursor_position = Point {
+                        x: cursor_position.x - bounds.x,
+                        y: cursor_position.y - bounds.y,
+                    };
 
-            let layer_rect = self.layers[self.selected_layer].handler.get_rect();
-
-            let (near_left, near_right, near_top, near_bottom) =
-                cursor_to_pivot(in_cursor_position, &layer_rect, 4.);
-
-            return get_cursor_type_from_rect(
-                in_cursor_position,
-                &layer_rect,
-                near_left,
-                near_right,
-                near_top,
-                near_bottom,
-            );
+                    let layer_rect = self.layers[self.selected_layer].handler.get_rect();
+                    let opt_pivot = position_to_pivot(in_cursor_position, &layer_rect, 4.);
+                    return pivot_to_cursor(in_cursor_position, &layer_rect, opt_pivot);
+                }
+            }
         }
-
         mouse::Interaction::default()
     }
 }
 
-fn cursor_to_pivot(
-    cursor_position: Point,
-    bounds: &Rectangle,
-    threshold: f32,
-) -> (bool, bool, bool, bool) {
-    let near_left =
-        cursor_position.x > bounds.x - threshold && cursor_position.x < bounds.x + threshold;
-    let near_right = cursor_position.x > bounds.x + bounds.width - threshold
-        && cursor_position.x < bounds.x + bounds.width + threshold;
-    let near_top =
-        cursor_position.y > bounds.y - threshold && cursor_position.y < bounds.y + threshold;
-    let near_bottom = cursor_position.y > bounds.y + bounds.height - threshold
-        && cursor_position.y < bounds.y + bounds.height + threshold;
+fn position_to_pivot(cursor_position: Point, bounds: &Rectangle, threshold: f32) -> Option<Point> {
+    let mut pivot_x = -1.0;
+    let mut pivot_y = -1.0;
 
-    (near_left, near_right, near_top, near_bottom)
+    if cursor_position.x > bounds.x - threshold && cursor_position.x < bounds.x + threshold {
+        pivot_x = 1.0;
+    } else if cursor_position.x > bounds.x + bounds.width - threshold
+        && cursor_position.x < bounds.x + bounds.width + threshold
+    {
+        pivot_x = 0.0;
+    }
+
+    if cursor_position.y > bounds.y - threshold && cursor_position.y < bounds.y + threshold {
+        pivot_y = 1.0;
+    } else if cursor_position.y > bounds.y + bounds.height - threshold
+        && cursor_position.y < bounds.y + bounds.height + threshold
+    {
+        pivot_y = 0.0;
+    }
+
+    if pivot_x >= 0. && pivot_y < 0. {
+        pivot_y = 0.5;
+    } else if pivot_y >= 0. && pivot_x < 0. {
+        pivot_x = 0.5;
+    }
+
+    if pivot_x >= 0.0 && pivot_y >= 0.0 {
+        Some(Point::new(pivot_x, pivot_y))
+    } else {
+        None
+    }
 }
 
-fn get_cursor_type_from_rect(
+fn pivot_to_cursor(
     cursor_position: Point,
     bounds: &Rectangle,
-    near_left: bool,
-    near_right: bool,
-    near_top: bool,
-    near_bottom: bool,
+    pivot: Option<Point>,
 ) -> mouse::Interaction {
-    if near_left && near_top || near_right && near_bottom {
-        mouse::Interaction::ResizingDiagonallyDown
-    } else if near_left && near_bottom || near_right && near_top {
-        mouse::Interaction::ResizingDiagonallyUp
-    } else if near_left || near_right {
-        mouse::Interaction::ResizingHorizontally
-    } else if near_top || near_bottom {
-        mouse::Interaction::ResizingVertically
+    if let Some(pivot) = pivot {
+        match (pivot.x, pivot.y) {
+            (0.0, 0.0) | (1.0, 1.0) => mouse::Interaction::ResizingDiagonallyDown,
+            (0.0, 1.0) | (1.0, 0.0) => mouse::Interaction::ResizingDiagonallyUp,
+            (0.0, 0.5) | (1.0, 0.5) => mouse::Interaction::ResizingHorizontally,
+            (0.5, 0.0) | (0.5, 1.0) => mouse::Interaction::ResizingVertically,
+            _ => mouse::Interaction::default(),
+        }
     } else if bounds.contains(cursor_position) {
         mouse::Interaction::Move
     } else {
