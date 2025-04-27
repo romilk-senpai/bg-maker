@@ -136,7 +136,7 @@ impl MakerCanvas {
         self.selected_layer = 69420;
     }
 
-    pub fn render_sim(&self, simulator: &mut Simulator) {
+    pub fn export_as_png(&self, simulator: &mut Simulator, path: PathBuf) {
         let scale_factor = 2.0;
         let screenshot = simulator
             .screenshot(
@@ -148,9 +148,6 @@ impl MakerCanvas {
                 scale_factor,
             )
             .unwrap();
-
-        let now = chrono::Local::now();
-        let path = format!("image-{}.png", now.format("%Y-%m-%d_%H-%M-%S"));
 
         let _ = image::save_buffer(
             &path,

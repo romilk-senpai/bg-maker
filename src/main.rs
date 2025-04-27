@@ -5,6 +5,8 @@ mod simulator;
 mod styles;
 mod utils;
 
+use std::path::PathBuf;
+
 use iced::Length::Fill;
 use iced::widget::container::Style;
 use iced::widget::{button, column, container, row, text};
@@ -27,6 +29,7 @@ enum Message {
     SelectLayer(usize),
     DeselectLayers,
     MoveSelection(f32, f32),
+    SavePathSelected(Option<PathBuf>),
 }
 
 struct BgMaker {
@@ -68,9 +71,6 @@ impl BgMaker {
             Message::RemoveImage(id) => {
                 self.canvas.remove_layer(id);
             }
-            Message::SaveAsPng => {
-                self.canvas.render_sim(&mut self.simulator);
-            }
             Message::SelectLayer(index) => {
                 self.canvas.select_layer(index);
             }
@@ -80,6 +80,24 @@ impl BgMaker {
             Message::DeselectLayers => {
                 self.canvas.deselect_layers();
             }
+            Message::SaveAsPng => {
+                let task = async {
+                    let now = chrono::Local::now();
+                    let file_name = format!("image-{}.png", now.format("%Y-%m-%d_%H-%M-%S"));
+                    let file = AsyncFileDialog::new()
+                        .add_filter("PNG Image", &["png"])
+                        .set_file_name(file_name)
+                        .save_file()
+                        .await;
+                    file.map(|f| f.path().to_path_buf())
+                };
+                return Task::perform(task, Message::SavePathSelected);
+            }
+            Message::SavePathSelected(Some(path)) => {
+                self.canvas.export_as_png(&mut self.simulator, path);
+                return Task::none();
+            }
+            Message::SavePathSelected(None) => return Task::none(),
         }
 
         Task::none()
