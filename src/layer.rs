@@ -48,32 +48,43 @@ impl Layer {
         let mut rect = self.handler.get_rect();
         let width = rect.width;
         let height = rect.height;
+        let aspect = width / height;
 
-        let effective_delta_x = delta_x * (1. - 2. * pivot.x);
-        let effective_delta_y = delta_y * (1. - 2. * pivot.y);
+        let effective_delta_x = delta_x * (1.0 - 2.0 * pivot.x);
+        let effective_delta_y = delta_y * (1.0 - 2.0 * pivot.y);
 
         let mut new_width: f32;
         let mut new_height: f32;
 
         if preserve_aspect {
-            let scale_x = (width + effective_delta_x) / width;
-            new_width = width * scale_x;
-            new_height = height * scale_x;
+            if pivot.x == 0.0 || pivot.x == 1.0 {
+                new_width = width + effective_delta_x;
+                new_height = new_width / aspect;
+            } else if pivot.y == 0.0 || pivot.y == 1.0 {
+                new_height = height + effective_delta_y;
+                new_width = new_height * aspect;
+            } else {
+                if effective_delta_x.abs() > effective_delta_y.abs() {
+                    new_width = width + effective_delta_x;
+                    new_height = new_width / aspect;
+                } else {
+                    new_height = height + effective_delta_y;
+                    new_width = new_height * aspect;
+                }
+            }
         } else {
             new_width = width + effective_delta_x;
-            new_height = height + effective_delta_y;
+            new_height = height + effective_delta_y
         };
 
-        if new_width < 16. || new_height < 16. {
-            new_width = new_width.max(16.);
-            new_height = new_height.max(16.);
-        } else {
-            rect.x -= (new_width - width) * pivot.x;
-            rect.y -= (new_height - height) * pivot.y;
-        }
+        new_width = new_width.max(1.0);
+        new_height = new_height.max(1.0);
 
-        rect.height = new_height;
+        rect.x -= (new_width - width) * pivot.x;
+        rect.y -= (new_height - height) * pivot.y;
+
         rect.width = new_width;
+        rect.height = new_height;
 
         self.handler.set_rect(rect);
     }
