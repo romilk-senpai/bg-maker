@@ -48,7 +48,10 @@ impl Layer {
     }
 
     fn move_by(&mut self, x: f32, y: f32) {
-        self.handler.move_by(x, y);
+        let mut rect = self.handler.get_rect();
+        rect.x += x;
+        rect.y += y;
+        self.handler.set_rect(rect);
     }
 
     fn on_select(&mut self) {
@@ -59,6 +62,34 @@ impl Layer {
     fn on_deselect(&mut self) {
         self.handler.on_deselect();
         self.is_selected = false;
+    }
+
+    fn resize_by(&mut self, delta_x: f32, delta_y: f32, pivot: Point, preserve_aspect: bool) {
+        let mut rect = self.handler.get_rect();
+        let width = rect.width;
+        let height = rect.height;
+
+        let effective_delta_x = delta_x * (1. - 2. * pivot.x);
+        let effective_delta_y = delta_y * (1. - 2. * pivot.y);
+
+        let new_width: f32;
+        let new_height: f32;
+
+        if preserve_aspect {
+            new_width = width + effective_delta_x;
+            new_height = height + effective_delta_y;
+        } else {
+            new_width = width + effective_delta_x;
+            new_height = height + effective_delta_y;
+        };
+
+        rect.x -= (new_width - width) * pivot.x;
+        rect.y -= (new_height - height) * pivot.y;
+
+        rect.width = new_width;
+        rect.height = new_height;
+
+        self.handler.set_rect(rect);
     }
 }
 
@@ -112,12 +143,8 @@ impl MakerCanvas {
         }
     }
 
+    #[allow(dead_code)]
     pub fn apply_bg(&self) {}
-
-    pub fn move_selection(&mut self, delta_x: f32, delta_y: f32) {
-        let layer = &mut self.layers[self.selected_layer];
-        layer.move_by(delta_x, delta_y);
-    }
 
     pub fn select_layer(&mut self, index: usize) {
         if self.selected_layer != 69420 {
@@ -126,6 +153,22 @@ impl MakerCanvas {
 
         self.selected_layer = index;
         self.layers[self.selected_layer].on_select();
+    }
+
+    pub fn move_selection(&mut self, delta_x: f32, delta_y: f32) {
+        let layer = &mut self.layers[self.selected_layer];
+        layer.move_by(delta_x, delta_y);
+    }
+
+    pub fn resize_selection(
+        &mut self,
+        delta_x: f32,
+        delta_y: f32,
+        pivot: Point,
+        preserve_aspect: bool,
+    ) {
+        let layer = &mut self.layers[self.selected_layer];
+        layer.resize_by(delta_x, delta_y, pivot, preserve_aspect);
     }
 
     pub fn deselect_layers(&mut self) {
@@ -164,6 +207,7 @@ impl MakerCanvas {
 pub enum Interaction {
     None,
     Dragging { position: Point },
+    Resizing { position: Point, pivot: Point },
 }
 
 impl Default for Interaction {
@@ -206,15 +250,30 @@ impl canvas::Program<Message> for MakerCanvas {
     ) -> Option<canvas::Action<Message>> {
         match event {
             canvas::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
-                let cursor_position = match cursor.position() {
+                let position = match cursor.position() {
                     Some(pos) => Point { x: pos.x, y: pos.y },
                     None => return None,
                 };
 
                 let in_cursor_position = Point {
-                    x: cursor_position.x - bounds.x,
-                    y: cursor_position.y - bounds.y,
+                    x: position.x - bounds.x,
+                    y: position.y - bounds.y,
                 };
+
+                if self.selected_layer != 69420 {
+                    let layer_rect = self.layers[self.selected_layer].handler.get_rect();
+                    let (near_left, near_right, near_top, near_bottom) =
+                        cursor_in_resize_bounds(in_cursor_position, &layer_rect, 4.);
+
+                    if near_left || near_right || near_top || near_bottom {
+                        let pivot = Point::new(
+                            if near_left { 1. } else { 0. },
+                            if near_top { 1. } else { 0. },
+                        );
+                        *state = Interaction::Resizing { position, pivot };
+                        return None;
+                    }
+                }
 
                 for (index, layer) in self.layers.iter().enumerate().rev() {
                     let rect = layer.handler.get_rect();
@@ -223,9 +282,7 @@ impl canvas::Program<Message> for MakerCanvas {
                     }
 
                     if self.selected_layer == index {
-                        *state = Interaction::Dragging {
-                            position: cursor_position,
-                        };
+                        *state = Interaction::Dragging { position };
                         return None;
                     } else {
                         return Some(canvas::Action::publish(Message::SelectLayer(index)));
@@ -235,16 +292,35 @@ impl canvas::Program<Message> for MakerCanvas {
                 return Some(canvas::Action::publish(Message::DeselectLayers));
             }
 
-            canvas::Event::Mouse(mouse::Event::CursorMoved { position }) => {
-                if let Interaction::Dragging { position: offset } = *state {
-                    let delta = Point::new(position.x - offset.x, position.y - offset.y);
+            canvas::Event::Mouse(mouse::Event::CursorMoved { position }) => match *state {
+                Interaction::Dragging {
+                    position: old_position,
+                } => {
+                    let delta =
+                        Point::new(position.x - old_position.x, position.y - old_position.y);
                     let position = position.to_owned();
                     *state = Interaction::Dragging { position };
                     return Some(canvas::Action::publish(Message::MoveSelection(
                         delta.x, delta.y,
                     )));
                 }
-            }
+                Interaction::Resizing {
+                    position: offset,
+                    pivot,
+                } => {
+                    let delta = Point::new(position.x - offset.x, position.y - offset.y);
+                    let position = position.to_owned();
+                    *state = Interaction::Resizing { position, pivot };
+                    let preserve_aspect = true;
+                    return Some(canvas::Action::publish(Message::ResizeSelection(
+                        delta.x,
+                        delta.y,
+                        pivot,
+                        preserve_aspect,
+                    )));
+                }
+                Interaction::None => (),
+            },
             canvas::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
                 *state = Interaction::None;
                 return None;

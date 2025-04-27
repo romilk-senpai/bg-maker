@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
 use iced::{
+    Color, Element, Point, Rectangle, Size,
     advanced::{
         graphics::geometry::{Path, Style},
         image::Handle,
     },
     widget::canvas::{Frame, Stroke},
-    Color, Element, Point, Rectangle, Size,
 };
 
 use crate::Message;
@@ -15,7 +15,7 @@ pub trait LayerHandler: 'static {
     fn get_preview(&self) -> Element<Message>;
     fn draw(&self, frame: &mut Frame);
     fn get_rect(&self) -> Rectangle;
-    fn move_by(&mut self, x: f32, y: f32);
+    fn set_rect(&mut self, rect: Rectangle);
     fn on_select(&mut self);
     fn on_deselect(&mut self);
 }
@@ -83,9 +83,8 @@ impl LayerHandler for ImageLayer {
         self.rect
     }
 
-    fn move_by(&mut self, x: f32, y: f32) {
-        self.rect.x += x;
-        self.rect.y += y;
+    fn set_rect(&mut self, rect: Rectangle) {
+        self.rect = rect;
     }
 
     fn on_select(&mut self) {

@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use iced::Length::Fill;
 use iced::widget::container::Style;
 use iced::widget::{button, column, container, row, text};
-use iced::{Alignment, Length, keyboard};
+use iced::{Alignment, Length, Point, keyboard};
 use iced::{Element, Subscription, Task};
 use id::Id;
 use maker_canvas::MakerCanvas;
@@ -30,6 +30,7 @@ enum Message {
     DeselectLayers,
     MoveSelection(f32, f32),
     SavePathSelected(Option<PathBuf>),
+    ResizeSelection(f32, f32, Point, bool),
 }
 
 struct BgMaker {
@@ -76,6 +77,10 @@ impl BgMaker {
             }
             Message::MoveSelection(delta_x, delta_y) => {
                 self.canvas.move_selection(delta_x, delta_y);
+            }
+            Message::ResizeSelection(delta_x, delta_y, point, preserve_aspect) => {
+                self.canvas
+                    .resize_selection(delta_x, delta_y, point, preserve_aspect);
             }
             Message::DeselectLayers => {
                 self.canvas.deselect_layers();
