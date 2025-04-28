@@ -8,7 +8,11 @@ use iced::{
 use layer_handler::ImageLayer;
 
 use crate::{
-    bg_maker::{Message, PngError}, id::{Id, IdGenerator}, layer::Layer, layer_handler, simulator::Simulator
+    bg_maker::{Message, PngError},
+    id::{Id, IdGenerator},
+    layer::Layer,
+    layer_handler,
+    simulator::Simulator,
 };
 
 pub struct MakerCanvas {
@@ -71,9 +75,30 @@ impl MakerCanvas {
         self.layers[self.selected_layer].on_select();
     }
 
-    pub fn move_selection(&mut self, delta_x: f32, delta_y: f32) {
-        let layer = &mut self.layers[self.selected_layer];
-        layer.move_by(delta_x, delta_y);
+    pub fn move_selection(&mut self, delta_x: f32, delta_y: f32, snap: bool) {
+        if snap {
+            let layer = &mut self.layers[self.selected_layer];
+            layer.move_by(delta_x, delta_y);
+        } else {
+            let (before, rest) = self.layers.split_at_mut(self.selected_layer);
+            let (current_layer, after) = rest.split_first_mut().unwrap();
+
+            let bounds = Rectangle {
+                x: 0.,
+                y: 0.,
+                width: self.width,
+                height: self.height,
+            };
+
+            let other_layers = before.iter().chain(after.iter());
+
+            current_layer.move_by_snap(
+                delta_x,
+                delta_y,
+                &other_layers.collect::<Vec<_>>(),
+                &bounds,
+            );
+        }
     }
 
     pub fn resize_selection(
@@ -217,8 +242,9 @@ impl canvas::Program<Message> for MakerCanvas {
                         Point::new(position.x - old_position.x, position.y - old_position.y);
                     let position = position.to_owned();
                     *state = Interaction::Dragging { position };
+                    let snap = self.shift_held;
                     return Some(canvas::Action::publish(Message::MoveSelection(
-                        delta.x, delta.y,
+                        delta.x, delta.y, snap,
                     )));
                 }
                 Interaction::Resizing {

@@ -11,6 +11,10 @@ mod utils;
 
 fn main() -> iced::Result {
     iced::application(BgMaker::new, BgMaker::update, BgMaker::view)
+        .window(iced::window::Settings {
+            maximized: true,
+            ..Default::default()
+        })
         .subscription(BgMaker::subscription)
         .title(BgMaker::title)
         .run()

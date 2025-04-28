@@ -1,4 +1,4 @@
-use iced::{Point, widget::canvas::Frame};
+use iced::{Point, Rectangle, widget::canvas::Frame};
 
 use crate::{id::Id, layer_handler::LayerHandler};
 
@@ -31,6 +31,38 @@ impl Layer {
         let mut rect = self.handler.get_rect();
         rect.x += x;
         rect.y += y;
+        self.handler.set_rect(rect);
+    }
+
+    pub fn move_by_snap(&mut self, x: f32, y: f32, layers: &Vec<&Layer>, bounds: &Rectangle) {
+        let mut rect = self.handler.get_rect();
+
+        rect.x += x;
+        rect.y += y;
+
+        const SNAP_DISTANCE: f32 = 3.0;
+
+        if (rect.x - bounds.x).abs() < SNAP_DISTANCE {
+            rect.x = bounds.x;
+        }
+        if (rect.y - bounds.y).abs() < SNAP_DISTANCE {
+            rect.y = bounds.y;
+        }
+        if ((rect.x + rect.width) - (bounds.x + bounds.width)).abs() < SNAP_DISTANCE {
+            rect.x = bounds.x + bounds.width - rect.width;
+        }
+        if ((rect.y + rect.height) - (bounds.y + bounds.height)).abs() < SNAP_DISTANCE {
+            rect.y = bounds.y + bounds.height - rect.height;
+        }
+
+        for &layer in layers {
+            if std::ptr::eq(layer, self) {
+                continue;
+            }
+
+            // let other = layer.handler.get_rect();
+        }
+
         self.handler.set_rect(rect);
     }
 

@@ -23,9 +23,9 @@ pub enum Message {
     SaveAsPng,
     SelectLayer(usize),
     DeselectLayers,
-    MoveSelection(f32, f32),
-    SavePathSelected(Option<PathBuf>),
+    MoveSelection(f32, f32, bool),
     ResizeSelection(f32, f32, Point, bool),
+    SavePathSelected(Option<PathBuf>),
     ShiftHeld(bool),
     Undo,
     Redo,
@@ -73,8 +73,8 @@ impl BgMaker {
             Message::SelectLayer(index) => {
                 self.canvas.select_layer(index);
             }
-            Message::MoveSelection(delta_x, delta_y) => {
-                self.canvas.move_selection(delta_x, delta_y);
+            Message::MoveSelection(delta_x, delta_y, snap) => {
+                self.canvas.move_selection(delta_x, delta_y, snap);
             }
             Message::ResizeSelection(delta_x, delta_y, point, preserve_aspect) => {
                 self.canvas

@@ -17,5 +17,7 @@ tokio = "1"
 image = { version= "0.25.6", features = [ "png" ] }
 iced = { git = "https://github.com/iced-rs/iced.git", features = [ "canvas", "image", "advanced", "tokio" ], branch = "master" }
 iced_runtime = { git = "https://github.com/iced-rs/iced.git", branch = "master" }
+# https://github.com/iced-rs/iced/blob/master/Cargo.toml
+winit = { git = "https://github.com/iced-rs/winit.git", rev = "11414b6aa45699f038114e61b4ddf5102b2d3b4b" }
 rfd = "0.15.3"
 chrono = "0.4.40"
