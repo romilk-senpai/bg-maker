@@ -120,7 +120,7 @@ impl MakerCanvas {
         self.selected_layer = 69420;
     }
 
-    pub fn export_as_png(&self, simulator: &mut Simulator, path: PathBuf) {
+    pub fn export_as_png(&self, simulator: &mut Simulator, path: &PathBuf) {
         let scale_factor = 2.0;
         let screenshot = simulator
             .screenshot(

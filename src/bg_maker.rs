@@ -10,22 +10,25 @@ use maker_canvas::MakerCanvas;
 use rfd::AsyncFileDialog;
 use simulator::Simulator;
 
-use crate::{id, maker_canvas, simulator, styles};
+use crate::{id, maker_canvas, simulator, styles, utils};
 
 #[derive(Clone, Debug)]
 pub struct PngError(pub String);
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    None,
     AddImage,
     ImageSelected(Option<std::path::PathBuf>),
     RemoveImage(Id),
     SaveAsPng,
+    SaveApply,
     SelectLayer(usize),
     DeselectLayers,
     MoveSelection(f32, f32, bool),
     ResizeSelection(f32, f32, Point, bool),
     SavePathSelected(Option<PathBuf>),
+    SaveApplyPathSelected(Option<PathBuf>),
     ShiftHeld(bool),
     Undo,
     Redo,
@@ -66,7 +69,6 @@ impl BgMaker {
             Message::ImageSelected(Some(path)) => {
                 self.canvas.add_layer(path);
             }
-            Message::ImageSelected(None) => {}
             Message::RemoveImage(id) => {
                 self.canvas.remove_layer(id);
             }
@@ -84,29 +86,43 @@ impl BgMaker {
                 self.canvas.deselect_layers();
             }
             Message::SaveAsPng => {
-                let task = async {
-                    let now = chrono::Local::now();
-                    let file_name = format!("image-{}.png", now.format("%Y-%m-%d_%H-%M-%S"));
-                    let file = AsyncFileDialog::new()
-                        .add_filter("PNG Image", &["png"])
-                        .set_file_name(file_name)
-                        .save_file()
-                        .await;
-                    file.map(|f| f.path().to_path_buf())
-                };
+                let task = choose_save_file_path();
                 return Task::perform(task, Message::SavePathSelected);
             }
-            Message::SavePathSelected(Some(path)) => {
-                self.canvas.export_as_png(&mut self.simulator, path);
-                return Task::none();
+            Message::SaveApply => {
+                let task = choose_save_file_path();
+                return Task::perform(task, Message::SaveApplyPathSelected);
             }
-            Message::SavePathSelected(None) => return Task::none(),
+            Message::SavePathSelected(Some(path)) => {
+                self.canvas.export_as_png(&mut self.simulator, &path);
+            }
+            Message::SaveApplyPathSelected(Some(path)) => {
+                self.canvas.export_as_png(&mut self.simulator, &path);
+
+                let task = async move {
+                    for _ in 0..10 {
+                        if path.exists() {
+                            break;
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    }
+
+                    let path_str = path.to_str();
+                    match utils::wallpaper::set_wallpaper(path_str.unwrap()) {
+                        Ok(_) => println!("Wallpaper set successfully!"),
+                        Err(e) => eprintln!("Failed to set wallpaper: {:?}", e),
+                    }
+                };
+
+                return Task::perform(task, |_| Message::None);
+            }
+            Message::SaveApplyPathSelected(None) => return Task::none(),
             Message::ShiftHeld(held) => {
                 self.canvas.set_shift_state(held);
-                return Task::none();
             }
             Message::Undo => todo!(),
             Message::Redo => todo!(),
+            _ => return Task::none(),
         }
 
         Task::none()
@@ -119,7 +135,7 @@ impl BgMaker {
                 button("Load project"),
                 button("Add Image").on_press(Message::AddImage),
                 button("Export to PNG").on_press(Message::SaveAsPng),
-                button("Save & Apply"),
+                button("Save & Apply").on_press(Message::SaveApply),
             ]
             .spacing(4),
             row![
@@ -201,4 +217,15 @@ fn handle_hotkey_release(key: keyboard::Key, _modifiers: keyboard::Modifiers) ->
         },
         _ => None,
     }
+}
+
+async fn choose_save_file_path() -> Option<PathBuf> {
+    let now = chrono::Local::now();
+    let file_name = format!("image-{}.png", now.format("%Y-%m-%d_%H-%M-%S"));
+    let file = AsyncFileDialog::new()
+        .add_filter("PNG Image", &["png"])
+        .set_file_name(file_name)
+        .save_file()
+        .await;
+    file.map(|f| f.path().to_path_buf())
 }

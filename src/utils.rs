@@ -1,5 +1,5 @@
 #[cfg(windows)]
-mod wallpaper {
+pub mod wallpaper {
     use windows::{
         Win32::{
             System::Com::{
@@ -10,7 +10,6 @@ mod wallpaper {
         core::PCWSTR,
     };
 
-    #[allow(dead_code)]
     pub fn set_wallpaper(image_path: &str) -> Result<(), windows::core::Error> {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
@@ -36,10 +35,3 @@ mod wallpaper {
         todo!();
     }
 }
-/*
-let image_path = r"C:\wallpaper.jpg";
-match set_wallpaper(image_path) {
-    Ok(_) => println!("Wallpaper set successfully!"),
-    Err(e) => eprintln!("Failed to set wallpaper: {:?}", e),
-}
-*/
