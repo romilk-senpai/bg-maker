@@ -19,7 +19,7 @@ pub struct PngError(pub String);
 pub enum Message {
     None,
     AddImage,
-    ImageSelected(Option<std::path::PathBuf>),
+    ImageSelected(Option<Vec<PathBuf>>),
     RemoveImage(Id),
     SaveAsPng,
     SaveApply,
@@ -58,16 +58,23 @@ impl BgMaker {
         match message {
             Message::AddImage => {
                 let task = async {
-                    let file = AsyncFileDialog::new()
+                    let files = AsyncFileDialog::new()
                         .add_filter("image", &["png", "jpg", "jpeg"])
-                        .pick_file()
+                        .pick_files()
                         .await;
-                    file.map(|f| f.path().to_path_buf())
+                    files.map(|selected| {
+                        selected
+                            .iter()
+                            .map(|f| f.path().to_path_buf())
+                            .collect::<Vec<_>>()
+                    })
                 };
                 return Task::perform(task, Message::ImageSelected);
             }
-            Message::ImageSelected(Some(path)) => {
-                self.canvas.add_layer(path);
+            Message::ImageSelected(Some(paths)) => {
+                for path in paths {
+                    self.canvas.add_image_layer(path);
+                }
             }
             Message::RemoveImage(id) => {
                 self.canvas.remove_layer(id);
@@ -133,7 +140,7 @@ impl BgMaker {
             row![
                 button("Save project"),
                 button("Load project"),
-                button("Add Image").on_press(Message::AddImage),
+                button("Add Images").on_press(Message::AddImage),
                 button("Export to PNG").on_press(Message::SaveAsPng),
                 button("Save & Apply").on_press(Message::SaveApply),
             ]

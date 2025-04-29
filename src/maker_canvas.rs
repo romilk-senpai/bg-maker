@@ -46,7 +46,7 @@ impl MakerCanvas {
         canvas.into()
     }
 
-    pub fn add_layer(&mut self, image_path: PathBuf) {
+    pub fn add_image_layer(&mut self, image_path: PathBuf) {
         let name = image_path
             .file_name()
             .and_then(|os_str| os_str.to_str())
