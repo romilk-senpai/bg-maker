@@ -39,7 +39,7 @@ impl Layer {
         delta: Point,
         layers: &Vec<&Layer>,
         bounds: &Rectangle,
-    ) -> Point {
+    ) -> (Point, Point) {
         let mut rect = self.handler.get_rect();
 
         let orig_x = rect.x;
@@ -48,19 +48,25 @@ impl Layer {
         rect.x += delta.x;
         rect.y += delta.y;
 
+        let mut snap_point = Point::new(-1., -1.);
+
         const SNAP_DISTANCE: f32 = 3.0;
 
         if (rect.x - bounds.x).abs() < SNAP_DISTANCE {
             rect.x = bounds.x;
+            snap_point.x = 0.;
         }
         if (rect.y - bounds.y).abs() < SNAP_DISTANCE {
             rect.y = bounds.y;
+            snap_point.y = 0.;
         }
         if ((rect.x + rect.width) - (bounds.x + bounds.width)).abs() < SNAP_DISTANCE {
             rect.x = bounds.x + bounds.width - rect.width;
+            snap_point.x = 1.0;
         }
         if ((rect.y + rect.height) - (bounds.y + bounds.height)).abs() < SNAP_DISTANCE {
             rect.y = bounds.y + bounds.height - rect.height;
+            snap_point.y = 1.0;
         }
 
         for &layer in layers {
@@ -77,12 +83,16 @@ impl Layer {
 
             if (left - other_right).abs() < SNAP_DISTANCE {
                 rect.x = other_right;
+                snap_point.x = 0.;
             } else if (left - other_left).abs() < SNAP_DISTANCE {
                 rect.x = other_left;
+                snap_point.x = 0.;
             } else if (right - other_left).abs() < SNAP_DISTANCE {
                 rect.x = other_left - rect.width;
+                snap_point.x = 1.0;
             } else if (right - other_right).abs() < SNAP_DISTANCE {
                 rect.x = other_right - rect.width;
+                snap_point.x = 1.0;
             }
 
             let top = rect.y;
@@ -92,18 +102,25 @@ impl Layer {
 
             if (top - other_bottom).abs() < SNAP_DISTANCE {
                 rect.y = other_bottom;
+                snap_point.y = 0.;
             } else if (top - other_top).abs() < SNAP_DISTANCE {
                 rect.y = other_top;
+                snap_point.y = 0.;
             } else if (bottom - other_top).abs() < SNAP_DISTANCE {
                 rect.y = other_top - rect.height;
+                snap_point.y = 1.0;
             } else if (bottom - other_bottom).abs() < SNAP_DISTANCE {
                 rect.y = other_bottom - rect.height;
+                snap_point.y = 1.0;
             }
         }
 
         self.handler.set_rect(rect);
 
-        Point::new(delta.x - (rect.x - orig_x), delta.y - (rect.y - orig_y))
+        (
+            Point::new(delta.x - (rect.x - orig_x), delta.y - (rect.y - orig_y)),
+            snap_point,
+        )
     }
 
     pub fn on_select(&mut self) {

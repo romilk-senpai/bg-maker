@@ -26,6 +26,7 @@ pub struct MakerCanvas {
     zoom: f32,
     shift_held: bool,
     ignored_delta_bank: Point,
+    snap_point: Point,
 }
 
 impl MakerCanvas {
@@ -38,7 +39,8 @@ impl MakerCanvas {
             height,
             zoom: 1.,
             shift_held: false,
-            ignored_delta_bank: Point::new(0., 0.),
+            ignored_delta_bank: Point::ORIGIN,
+            snap_point: Point::ORIGIN,
         }
     }
 
@@ -84,13 +86,16 @@ impl MakerCanvas {
     }
 
     pub fn move_selection(&mut self, delta: Point, snap: bool) {
+        let mut bank = self.ignored_delta_bank;
+        let mut delta = delta;
+
         if snap {
             let layer = &mut self.layers[self.selected_layer];
+            delta.x += bank.x;
+            delta.y += bank.y;
             layer.move_by(delta);
+            self.ignored_delta_bank = Point::ORIGIN;
         } else {
-            let (before, rest) = self.layers.split_at_mut(self.selected_layer);
-            let (current_layer, after) = rest.split_first_mut().unwrap();
-
             let bounds = Rectangle {
                 x: 0.,
                 y: 0.,
@@ -98,25 +103,32 @@ impl MakerCanvas {
                 height: self.height,
             };
 
-            let other_layers = before.iter().chain(after.iter());
+            const IGNORED_DELTA_THRESHOLD: f32 = 5.;
 
-            const IGNORED_DELTA_THRESHOLD: f32 = 10.;
-
-            let bank = self.ignored_delta_bank;
-            let mut delta = delta;
-
-            if bank.x.abs() > IGNORED_DELTA_THRESHOLD || bank.y.abs() > IGNORED_DELTA_THRESHOLD {
+            if (bank.x.abs() > IGNORED_DELTA_THRESHOLD) || (bank.y.abs() > IGNORED_DELTA_THRESHOLD)
+            {
                 delta.x += bank.x;
                 delta.y += bank.y;
                 self.ignored_delta_bank = Point::ORIGIN;
-                current_layer.move_by(delta);
-            } else {
-                let ignored_delta =
-                    current_layer.move_by_snap(delta, &other_layers.collect::<Vec<_>>(), &bounds);
-
-                self.ignored_delta_bank =
-                    Point::new(bank.x + ignored_delta.x, bank.y + ignored_delta.y);
+                bank = Point::ORIGIN;
             }
+
+            let (before, rest) = self.layers.split_at_mut(self.selected_layer);
+            let (current_layer, after) = rest.split_first_mut().unwrap();
+            let other_layers = before.iter().chain(after.iter());
+
+            let (ignored_delta, snap_point) =
+                current_layer.move_by_snap(delta, &other_layers.collect::<Vec<_>>(), &bounds);
+
+            if snap_point.x < 0. && snap_point.y < 0. {
+                current_layer.move_by(bank);
+                self.ignored_delta_bank = Point::ORIGIN;
+                bank = Point::ORIGIN;
+            }
+
+            self.snap_point = snap_point;
+            self.ignored_delta_bank =
+                Point::new(bank.x + ignored_delta.x, bank.y + ignored_delta.y);
         }
     }
 
@@ -165,6 +177,28 @@ impl MakerCanvas {
 
     pub fn set_shift_state(&mut self, held: bool) {
         self.shift_held = held;
+
+        let bank = self.ignored_delta_bank;
+
+        if bank.x.abs() > 0. || bank.y.abs() > 0. {
+            let layer = &mut self.layers[self.selected_layer];
+            layer.move_by(bank);
+            self.ignored_delta_bank = Point::ORIGIN;
+        }
+    }
+
+    pub fn on_left_button_released(&mut self) {
+        if self.selected_layer == 69420 || self.snap_point.x >= 0. || self.snap_point.y >= 0. {
+            return;
+        }
+
+        let bank = self.ignored_delta_bank;
+
+        if bank.x.abs() > 0. || bank.y.abs() > 0. {
+            let layer = &mut self.layers[self.selected_layer];
+            layer.move_by(bank);
+            self.ignored_delta_bank = Point::ORIGIN;
+        }
     }
 }
 
@@ -202,7 +236,6 @@ impl canvas::Program<Message> for MakerCanvas {
             if self.selected_layer != 69420 {
                 if let Interaction::Dragging { position: _ } = *state {
                     let rect = &self.layers[self.selected_layer].handler.get_rect();
-                    let bank = self.ignored_delta_bank;
 
                     let mut draw_line = |from: Point, to: Point| {
                         clipping_frame.stroke(
@@ -215,21 +248,22 @@ impl canvas::Program<Message> for MakerCanvas {
                         );
                     };
 
-                    if bank.x.abs() > 0. {
-                        let from = Point { x: rect.x, y: 0. };
+                    let snap_point = self.snap_point;
+
+                    if snap_point.x >= 0. {
+                        let x = rect.x + rect.width * snap_point.x;
+                        let from = Point { x, y: 0. };
                         let to = Point {
-                            x: rect.x,
+                            x,
                             y: bounds.height,
                         };
 
                         draw_line(from, to);
                     }
-                    if bank.y.abs() > 0. {
-                        let from = Point { x: 0., y: rect.y };
-                        let to = Point {
-                            x: bounds.width,
-                            y: rect.y,
-                        };
+                    if snap_point.y >= 0. {
+                        let y = rect.y + rect.height * snap_point.y;
+                        let from = Point { x: 0., y };
+                        let to = Point { x: bounds.width, y };
                         draw_line(from, to);
                     }
                 }
@@ -318,8 +352,13 @@ impl canvas::Program<Message> for MakerCanvas {
                 Interaction::None => (),
             },
             canvas::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
+                if let Interaction::None = *state {
+                    return None;
+                }
+
                 *state = Interaction::None;
-                return None;
+
+                return Some(canvas::Action::publish(Message::LeftButtonReleased));
             }
             _ => {}
         }

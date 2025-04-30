@@ -33,6 +33,7 @@ pub enum Message {
     ShiftHeld(bool),
     Undo,
     Redo,
+    LeftButtonReleased,
 }
 
 pub struct BgMaker {
@@ -130,6 +131,9 @@ impl BgMaker {
             Message::SaveApplyPathSelected(None) => return Task::none(),
             Message::ShiftHeld(held) => {
                 self.canvas.set_shift_state(held);
+            }
+            Message::LeftButtonReleased=>{
+                self.canvas.on_left_button_released();
             }
             Message::Undo => todo!(),
             Message::Redo => todo!(),
