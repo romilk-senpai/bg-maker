@@ -149,14 +149,14 @@ impl Layer {
         self.is_selected = false;
     }
 
-    pub fn resize_by(&mut self, delta_x: f32, delta_y: f32, pivot: Point, preserve_aspect: bool) {
+    pub fn resize_by(&mut self, delta: Point, pivot: Point, preserve_aspect: bool) {
         let mut rect = self.handler.get_rect();
         let width = rect.width;
         let height = rect.height;
         let aspect = width / height;
 
-        let effective_delta_x = delta_x * (1.0 - 2.0 * pivot.x);
-        let effective_delta_y = delta_y * (1.0 - 2.0 * pivot.y);
+        let effective_delta_x = delta.x * (1.0 - 2.0 * pivot.x);
+        let effective_delta_y = delta.y * (1.0 - 2.0 * pivot.y);
 
         let mut new_width: f32;
         let mut new_height: f32;

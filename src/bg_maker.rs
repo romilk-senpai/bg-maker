@@ -27,7 +27,7 @@ pub enum Message {
     DeselectLayers,
     StartMoving,
     MoveSelection(Point, bool),
-    ResizeSelection(f32, f32, Point, bool),
+    ResizeSelection(Point, Point, bool),
     SavePathSelected(Option<PathBuf>),
     SaveApplyPathSelected(Option<PathBuf>),
     ShiftHeld(bool),
@@ -90,9 +90,9 @@ impl BgMaker {
             Message::MoveSelection(delta, snap) => {
                 self.canvas.move_selection(delta, snap);
             }
-            Message::ResizeSelection(delta_x, delta_y, point, preserve_aspect) => {
+            Message::ResizeSelection(delta, point, preserve_aspect) => {
                 self.canvas
-                    .resize_selection(delta_x, delta_y, point, preserve_aspect);
+                    .resize_selection(delta, point, preserve_aspect);
             }
             Message::DeselectLayers => {
                 self.canvas.deselect_layers();

@@ -69,9 +69,6 @@ impl MakerCanvas {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn apply_bg(&self) {}
-
     pub fn select_layer(&mut self, index: usize) {
         if let Some(selected_layer) = self.selected_layer {
             self.layers[selected_layer].on_deselect();
@@ -92,7 +89,7 @@ impl MakerCanvas {
         let mut bank = self.ignored_delta_bank;
         let mut delta = delta;
 
-        if snap {
+        if !snap {
             let layer = &mut self.layers[selected_layer];
             delta.x += bank.x;
             delta.y += bank.y;
@@ -135,16 +132,52 @@ impl MakerCanvas {
         }
     }
 
-    pub fn resize_selection(
-        &mut self,
-        delta_x: f32,
-        delta_y: f32,
-        pivot: Point,
-        preserve_aspect: bool,
-    ) {
-        if let Some(selected_layer) = self.selected_layer {
+    pub fn resize_selection(&mut self, delta: Point, pivot: Point, preserve_aspect: bool) {
+        let Some(selected_layer) = self.selected_layer else {
+            return;
+        };
+
+        let snap = true;
+        let mut bank = self.ignored_delta_bank;
+        let mut delta = delta;
+
+        if !snap {
             let layer = &mut self.layers[selected_layer];
-            layer.resize_by(delta_x, delta_y, pivot, preserve_aspect);
+            layer.resize_by(delta, pivot, preserve_aspect);
+        } else {
+            let bounds = Rectangle {
+                x: 0.,
+                y: 0.,
+                width: self.width,
+                height: self.height,
+            };
+
+            const IGNORED_DELTA_THRESHOLD: f32 = 5.;
+
+            if (bank.x.abs() > IGNORED_DELTA_THRESHOLD) || (bank.y.abs() > IGNORED_DELTA_THRESHOLD)
+            {
+                delta.x += bank.x;
+                delta.y += bank.y;
+                self.ignored_delta_bank = Point::ORIGIN;
+                bank = Point::ORIGIN;
+            }
+
+            let (before, rest) = self.layers.split_at_mut(selected_layer);
+            let (current_layer, after) = rest.split_first_mut().unwrap();
+            let other_layers = before.iter().chain(after.iter());
+
+            let (ignored_delta, snap_point) =
+                current_layer.move_by_snap(delta, &other_layers.collect::<Vec<_>>(), &bounds);
+
+            if snap_point.x < 0. && snap_point.y < 0. {
+                current_layer.move_by(bank);
+                self.ignored_delta_bank = Point::ORIGIN;
+                bank = Point::ORIGIN;
+            }
+
+            self.snap_point = snap_point;
+            self.ignored_delta_bank =
+                Point::new(bank.x + ignored_delta.x, bank.y + ignored_delta.y);
         }
     }
 
@@ -293,9 +326,8 @@ impl canvas::Program<Message> for MakerCanvas {
     ) -> Option<canvas::Action<Message>> {
         match event {
             canvas::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
-                let position = match cursor.position() {
-                    Some(pos) => Point { x: pos.x, y: pos.y },
-                    None => return None,
+                let Some(position) = cursor.position() else {
+                    return None;
                 };
 
                 let in_cursor_position = Point {
@@ -305,13 +337,8 @@ impl canvas::Program<Message> for MakerCanvas {
 
                 if let Some(selected_layer) = self.selected_layer {
                     let layer_rect = self.layers[selected_layer].handler.get_rect();
-
-                    match position_to_pivot(in_cursor_position, &layer_rect, 4.) {
-                        Some(pivot) => {
-                            *state = Interaction::Resizing { position, pivot };
-                            return None;
-                        }
-                        None => {}
+                    if let Some(pivot) = position_to_pivot(in_cursor_position, &layer_rect, 4.) {
+                        *state = Interaction::Resizing { position, pivot };
                     }
                 }
 
@@ -342,7 +369,7 @@ impl canvas::Program<Message> for MakerCanvas {
                         Point::new(position.x - old_position.x, position.y - old_position.y);
                     let position = position.to_owned();
                     *state = Interaction::Dragging { position };
-                    let snap = self.shift_held;
+                    let snap = !self.shift_held;
                     return Some(canvas::Action::publish(Message::MoveSelection(delta, snap)));
                 }
                 Interaction::Resizing {
@@ -354,8 +381,7 @@ impl canvas::Program<Message> for MakerCanvas {
                     *state = Interaction::Resizing { position, pivot };
                     let preserve_aspect = self.shift_held;
                     return Some(canvas::Action::publish(Message::ResizeSelection(
-                        delta.x,
-                        delta.y,
+                        delta,
                         pivot,
                         preserve_aspect,
                     )));
@@ -368,7 +394,6 @@ impl canvas::Program<Message> for MakerCanvas {
                 }
 
                 *state = Interaction::None;
-
                 return Some(canvas::Action::publish(Message::LeftButtonReleased));
             }
             _ => {}
