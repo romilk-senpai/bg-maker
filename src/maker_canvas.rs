@@ -23,6 +23,7 @@ pub struct MakerCanvas {
     height: f32,
     zoom: f32,
     shift_held: bool,
+    ignored_delta_bank: Point,
 }
 
 impl MakerCanvas {
@@ -35,6 +36,7 @@ impl MakerCanvas {
             height,
             zoom: 1.,
             shift_held: false,
+            ignored_delta_bank: Point::new(0., 0.),
         }
     }
 
@@ -75,10 +77,14 @@ impl MakerCanvas {
         self.layers[self.selected_layer].on_select();
     }
 
-    pub fn move_selection(&mut self, delta_x: f32, delta_y: f32, snap: bool) {
+    pub fn on_start_drag(&mut self) {
+        self.ignored_delta_bank = Point::ORIGIN;
+    }
+
+    pub fn move_selection(&mut self, delta: Point, snap: bool) {
         if snap {
             let layer = &mut self.layers[self.selected_layer];
-            layer.move_by(delta_x, delta_y);
+            layer.move_by(delta);
         } else {
             let (before, rest) = self.layers.split_at_mut(self.selected_layer);
             let (current_layer, after) = rest.split_first_mut().unwrap();
@@ -92,12 +98,23 @@ impl MakerCanvas {
 
             let other_layers = before.iter().chain(after.iter());
 
-            current_layer.move_by_snap(
-                delta_x,
-                delta_y,
-                &other_layers.collect::<Vec<_>>(),
-                &bounds,
-            );
+            const IGNORED_DELTA_THRESHOLD: f32 = 10.;
+
+            let bank = self.ignored_delta_bank;
+            let mut delta = delta;
+
+            if bank.x.abs() > IGNORED_DELTA_THRESHOLD || bank.y.abs() > IGNORED_DELTA_THRESHOLD {
+                delta.x += bank.x;
+                delta.y += bank.y;
+                self.ignored_delta_bank = Point::ORIGIN;
+                current_layer.move_by(delta);
+            } else {
+                let ignored_delta =
+                    current_layer.move_by_snap(delta, &other_layers.collect::<Vec<_>>(), &bounds);
+
+                self.ignored_delta_bank =
+                    Point::new(bank.x + ignored_delta.x, bank.y + ignored_delta.y);
+            }
         }
     }
 
@@ -225,7 +242,7 @@ impl canvas::Program<Message> for MakerCanvas {
 
                     if self.selected_layer == index {
                         *state = Interaction::Dragging { position };
-                        return None;
+                        return Some(canvas::Action::publish(Message::StartMoving));
                     } else {
                         return Some(canvas::Action::publish(Message::SelectLayer(index)));
                     }
@@ -243,9 +260,7 @@ impl canvas::Program<Message> for MakerCanvas {
                     let position = position.to_owned();
                     *state = Interaction::Dragging { position };
                     let snap = self.shift_held;
-                    return Some(canvas::Action::publish(Message::MoveSelection(
-                        delta.x, delta.y, snap,
-                    )));
+                    return Some(canvas::Action::publish(Message::MoveSelection(delta, snap)));
                 }
                 Interaction::Resizing {
                     position: offset,
