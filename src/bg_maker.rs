@@ -83,9 +83,9 @@ impl BgMaker {
             Message::SelectLayer(index) => {
                 self.canvas.select_layer(index);
             }
-            Message::StartMoving=> {
+            Message::StartMoving => {
                 self.canvas.on_start_drag();
-            }            
+            }
             Message::MoveSelection(delta, snap) => {
                 self.canvas.move_selection(delta, snap);
             }

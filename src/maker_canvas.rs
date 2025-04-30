@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 
 use iced::{
-    Color, Element, Point, Rectangle, Renderer, Size, Theme, mouse,
-    widget::canvas::{self, Frame, Path},
+    Color, Element, Point, Rectangle, Renderer, Size, Theme,
+    advanced::graphics::geometry::Style,
+    mouse,
+    widget::canvas::{self, Frame, Path, Stroke},
 };
 
 use layer_handler::ImageLayer;
@@ -183,7 +185,7 @@ impl canvas::Program<Message> for MakerCanvas {
 
     fn draw(
         &self,
-        _state: &Self::State,
+        state: &Self::State,
         renderer: &Renderer,
         _theme: &Theme,
         bounds: iced::Rectangle,
@@ -195,6 +197,42 @@ impl canvas::Program<Message> for MakerCanvas {
             clipping_frame.fill(&background, Color::from_rgb8(24, 24, 28));
             for layer in &self.layers {
                 layer.draw(&mut clipping_frame);
+            }
+
+            if self.selected_layer != 69420 {
+                if let Interaction::Dragging { position: _ } = *state {
+                    let rect = &self.layers[self.selected_layer].handler.get_rect();
+                    let bank = self.ignored_delta_bank;
+
+                    let mut draw_line = |from: Point, to: Point| {
+                        clipping_frame.stroke(
+                            &Path::line(from, to),
+                            Stroke {
+                                style: Style::Solid(Color::from_rgb8(0, 208, 255)),
+                                width: 1.0,
+                                ..Default::default()
+                            },
+                        );
+                    };
+
+                    if bank.x.abs() > 0. {
+                        let from = Point { x: rect.x, y: 0. };
+                        let to = Point {
+                            x: rect.x,
+                            y: bounds.height,
+                        };
+
+                        draw_line(from, to);
+                    }
+                    if bank.y.abs() > 0. {
+                        let from = Point { x: 0., y: rect.y };
+                        let to = Point {
+                            x: bounds.width,
+                            y: rect.y,
+                        };
+                        draw_line(from, to);
+                    }
+                }
             }
         });
 
