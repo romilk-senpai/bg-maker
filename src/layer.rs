@@ -69,12 +69,28 @@ impl Layer {
             snap_point.y = 1.0;
         }
 
+        let center_x = rect.x + rect.width * 0.5;
+        let center_y = rect.y + rect.height * 0.5;
+
         for &layer in layers {
             if std::ptr::eq(layer, self) {
                 continue;
             }
 
             let other = layer.handler.get_rect();
+
+            let other_center_x = other.x + other.width * 0.5;
+            let other_center_y = other.y + other.height * 0.5;
+
+            if (center_x - other_center_x).abs() < SNAP_DISTANCE {
+                rect.x = other_center_x - rect.width * 0.5;
+                snap_point.x = 0.5;
+            }
+
+            if (center_y - other_center_y).abs() < SNAP_DISTANCE {
+                rect.y = other_center_y - rect.height * 0.5;
+                snap_point.y = 0.5;
+            }
 
             let left = rect.x;
             let right = rect.x + rect.width;
@@ -176,5 +192,90 @@ impl Layer {
         rect.height = new_height;
 
         self.handler.set_rect(rect);
+    }
+
+    pub fn resize_by_snap(
+        &mut self,
+        delta: Point,
+        layers: &Vec<&Layer>,
+        bounds: &Rectangle,
+    ) -> (Point, Point) {
+        let mut rect = self.handler.get_rect();
+
+        let orig_width = rect.width;
+        let orig_height = rect.height;
+
+        rect.width += delta.x;
+        rect.height += delta.y;
+
+        let mut snap_point = Point::new(-1., -1.);
+        const SNAP_DISTANCE: f32 = 3.0;
+
+        let right = rect.x + rect.width;
+        let bottom = rect.y + rect.height;
+
+        let bounds_right = bounds.x + bounds.width;
+        let bounds_bottom = bounds.y + bounds.height;
+
+        if (right - bounds_right).abs() < SNAP_DISTANCE {
+            rect.width = bounds_right - rect.x;
+            snap_point.x = 1.0;
+        }
+        if (bottom - bounds_bottom).abs() < SNAP_DISTANCE {
+            rect.height = bounds_bottom - rect.y;
+            snap_point.y = 1.0;
+        }
+
+        for &layer in layers {
+            if std::ptr::eq(layer, self) {
+                continue;
+            }
+
+            let other = layer.handler.get_rect();
+
+            let other_left = other.x;
+            let other_right = other.x + other.width;
+            let other_top = other.y;
+            let other_bottom = other.y + other.height;
+
+            if (rect.x + rect.width - other_left).abs() < SNAP_DISTANCE {
+                rect.width = other_left - rect.x;
+                snap_point.x = 1.0;
+            } else if (rect.x + rect.width - other_right).abs() < SNAP_DISTANCE {
+                rect.width = other_right - rect.x;
+                snap_point.x = 1.0;
+            }
+
+            if (rect.y + rect.height - other_top).abs() < SNAP_DISTANCE {
+                rect.height = other_top - rect.y;
+                snap_point.y = 1.0;
+            } else if (rect.y + rect.height - other_bottom).abs() < SNAP_DISTANCE {
+                rect.height = other_bottom - rect.y;
+                snap_point.y = 1.0;
+            }
+
+            let this_center_x = rect.x + rect.width;
+            let this_center_y = rect.y + rect.height;
+
+            let other_center_x = other.x + other.width * 0.5;
+            let other_center_y = other.y + other.height * 0.5;
+
+            if (this_center_x - other_center_x).abs() < SNAP_DISTANCE {
+                rect.width = other_center_x - rect.x;
+                snap_point.x = 0.5;
+            }
+
+            if (this_center_y - other_center_y).abs() < SNAP_DISTANCE {
+                rect.height = other_center_y - rect.y;
+                snap_point.y = 0.5;
+            }
+        }
+
+        self.handler.set_rect(rect);
+
+        (
+            Point::new(rect.width - orig_width, rect.height - orig_height),
+            snap_point,
+        )
     }
 }

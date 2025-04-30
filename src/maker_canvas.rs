@@ -20,7 +20,7 @@ use crate::{
 pub struct MakerCanvas {
     pub layers: Vec<Layer>,
     id_generator: IdGenerator,
-    selected_layer: usize,
+    selected_layer: Option<usize>,
     width: f32,
     height: f32,
     zoom: f32,
@@ -34,7 +34,7 @@ impl MakerCanvas {
         Self {
             layers: Vec::new(),
             id_generator: IdGenerator::new(),
-            selected_layer: 69420,
+            selected_layer: None,
             width,
             height,
             zoom: 1.,
@@ -73,12 +73,12 @@ impl MakerCanvas {
     pub fn apply_bg(&self) {}
 
     pub fn select_layer(&mut self, index: usize) {
-        if self.selected_layer != 69420 {
-            self.layers[self.selected_layer].on_deselect();
+        if let Some(selected_layer) = self.selected_layer {
+            self.layers[selected_layer].on_deselect();
         }
 
-        self.selected_layer = index;
-        self.layers[self.selected_layer].on_select();
+        self.selected_layer = Some(index);
+        self.layers[index].on_select();
     }
 
     pub fn on_start_drag(&mut self) {
@@ -86,11 +86,14 @@ impl MakerCanvas {
     }
 
     pub fn move_selection(&mut self, delta: Point, snap: bool) {
+        let Some(selected_layer) = self.selected_layer else {
+            return;
+        };
         let mut bank = self.ignored_delta_bank;
         let mut delta = delta;
 
         if snap {
-            let layer = &mut self.layers[self.selected_layer];
+            let layer = &mut self.layers[selected_layer];
             delta.x += bank.x;
             delta.y += bank.y;
             layer.move_by(delta);
@@ -113,7 +116,7 @@ impl MakerCanvas {
                 bank = Point::ORIGIN;
             }
 
-            let (before, rest) = self.layers.split_at_mut(self.selected_layer);
+            let (before, rest) = self.layers.split_at_mut(selected_layer);
             let (current_layer, after) = rest.split_first_mut().unwrap();
             let other_layers = before.iter().chain(after.iter());
 
@@ -139,16 +142,18 @@ impl MakerCanvas {
         pivot: Point,
         preserve_aspect: bool,
     ) {
-        let layer = &mut self.layers[self.selected_layer];
-        layer.resize_by(delta_x, delta_y, pivot, preserve_aspect);
+        if let Some(selected_layer) = self.selected_layer {
+            let layer = &mut self.layers[selected_layer];
+            layer.resize_by(delta_x, delta_y, pivot, preserve_aspect);
+        }
     }
 
     pub fn deselect_layers(&mut self) {
-        if self.selected_layer != 69420 {
-            self.layers[self.selected_layer].on_deselect();
+        if let Some(selected_layer) = self.selected_layer {
+            self.layers[selected_layer].on_deselect();
         }
 
-        self.selected_layer = 69420;
+        self.selected_layer = None;
     }
 
     pub fn export_as_png(&self, simulator: &mut Simulator, path: &PathBuf) {
@@ -178,26 +183,30 @@ impl MakerCanvas {
     pub fn set_shift_state(&mut self, held: bool) {
         self.shift_held = held;
 
-        let bank = self.ignored_delta_bank;
+        if let Some(selected_layer) = self.selected_layer {
+            let bank = self.ignored_delta_bank;
 
-        if bank.x.abs() > 0. || bank.y.abs() > 0. {
-            let layer = &mut self.layers[self.selected_layer];
-            layer.move_by(bank);
-            self.ignored_delta_bank = Point::ORIGIN;
+            if bank.x.abs() > 0. || bank.y.abs() > 0. {
+                let layer = &mut self.layers[selected_layer];
+                layer.move_by(bank);
+                self.ignored_delta_bank = Point::ORIGIN;
+            }
         }
     }
 
     pub fn on_left_button_released(&mut self) {
-        if self.selected_layer == 69420 || self.snap_point.x >= 0. || self.snap_point.y >= 0. {
-            return;
-        }
+        if let Some(selected_layer) = self.selected_layer {
+            if self.snap_point.x < 0. && self.snap_point.y < 0. {
+                let bank = self.ignored_delta_bank;
 
-        let bank = self.ignored_delta_bank;
+                if bank.x.abs() > 0. || bank.y.abs() > 0. {
+                    let layer = &mut self.layers[selected_layer];
+                    layer.move_by(bank);
+                    self.ignored_delta_bank = Point::ORIGIN;
+                }
+            }
 
-        if bank.x.abs() > 0. || bank.y.abs() > 0. {
-            let layer = &mut self.layers[self.selected_layer];
-            layer.move_by(bank);
-            self.ignored_delta_bank = Point::ORIGIN;
+            self.snap_point = Point::new(-1., -1.);
         }
     }
 }
@@ -233,9 +242,9 @@ impl canvas::Program<Message> for MakerCanvas {
                 layer.draw(&mut clipping_frame);
             }
 
-            if self.selected_layer != 69420 {
+            if let Some(selected_layer) = self.selected_layer {
                 if let Interaction::Dragging { position: _ } = *state {
-                    let rect = &self.layers[self.selected_layer].handler.get_rect();
+                    let rect = &self.layers[selected_layer].handler.get_rect();
 
                     let mut draw_line = |from: Point, to: Point| {
                         clipping_frame.stroke(
@@ -294,8 +303,8 @@ impl canvas::Program<Message> for MakerCanvas {
                     y: position.y - bounds.y,
                 };
 
-                if self.selected_layer != 69420 {
-                    let layer_rect = self.layers[self.selected_layer].handler.get_rect();
+                if let Some(selected_layer) = self.selected_layer {
+                    let layer_rect = self.layers[selected_layer].handler.get_rect();
 
                     match position_to_pivot(in_cursor_position, &layer_rect, 4.) {
                         Some(pivot) => {
@@ -312,12 +321,14 @@ impl canvas::Program<Message> for MakerCanvas {
                         continue;
                     }
 
-                    if self.selected_layer == index {
-                        *state = Interaction::Dragging { position };
-                        return Some(canvas::Action::publish(Message::StartMoving));
-                    } else {
-                        return Some(canvas::Action::publish(Message::SelectLayer(index)));
+                    if let Some(selected_layer) = self.selected_layer {
+                        if selected_layer == index {
+                            *state = Interaction::Dragging { position };
+                            return Some(canvas::Action::publish(Message::StartMoving));
+                        }
                     }
+
+                    return Some(canvas::Action::publish(Message::SelectLayer(index)));
                 }
 
                 return Some(canvas::Action::publish(Message::DeselectLayers));
@@ -377,7 +388,7 @@ impl canvas::Program<Message> for MakerCanvas {
                 return pivot_to_cursor(position, &bounds, Some(pivot));
             }
             Interaction::None => {
-                if self.selected_layer != 69420 {
+                if let Some(selected_layer) = self.selected_layer {
                     let cursor_position = match cursor.position() {
                         Some(pos) => Point { x: pos.x, y: pos.y },
                         None => return mouse::Interaction::default(),
@@ -388,7 +399,7 @@ impl canvas::Program<Message> for MakerCanvas {
                         y: cursor_position.y - bounds.y,
                     };
 
-                    let layer_rect = self.layers[self.selected_layer].handler.get_rect();
+                    let layer_rect = self.layers[selected_layer].handler.get_rect();
                     let opt_pivot = position_to_pivot(in_cursor_position, &layer_rect, 4.);
                     return pivot_to_cursor(in_cursor_position, &layer_rect, opt_pivot);
                 }
