@@ -346,20 +346,29 @@ impl Layer {
 
         self.handler.set_rect(rect);
 
-        // (10 - 10) + (20 - 10) = 10
-        // pivot (0.5 0)
-
         let weight_x = (pivot.x - 0.5).abs() * 2.0;
         let weight_y = (pivot.y - 0.5).abs() * 2.0;
 
-        let actual_delta_x = (orig_x - new_x) + (new_width - width);
-        let actual_delta_y = (orig_y - new_y) + (new_height - height);
+        let actual_delta_x = (rect.x - orig_x) + (rect.width - width) * (1.0 - pivot.x);
+        let actual_delta_y = (rect.y - orig_y) + (rect.height - height) * (1.0 - pivot.y);
 
-        // 10 - 10 = 0
-        let ignored_delta = Point::new(
-            (delta.x - actual_delta_x) * weight_x,
-            (delta.y - actual_delta_y) * weight_y,
-        );
+        let mut ignored_x = (delta.x - actual_delta_x) * weight_x;
+        let mut ignored_y = (delta.y - actual_delta_y) * weight_y;
+
+        if preserve_aspect {
+            if pivot.x == 0.0 || pivot.x == 1.0 {
+                ignored_y = 0.0;
+            } else if pivot.y == 0.0 || pivot.y == 1.0 {
+                ignored_x = 0.0;
+            } else {
+                if delta.x.abs() > delta.y.abs() {
+                    ignored_y = 0.0;
+                } else {
+                    ignored_x = 0.0;
+                }
+            }
+        }
+        let ignored_delta = Point::new(ignored_x, ignored_y);
 
         println!("{} {}", ignored_delta.x, ignored_delta.y);
 

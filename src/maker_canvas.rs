@@ -282,38 +282,38 @@ impl canvas::Program<Message> for MakerCanvas {
             }
 
             if let Some(selected_layer) = self.selected_layer {
-                if let Interaction::Dragging { position: _ } = *state {
-                    let rect = &self.layers[selected_layer].handler.get_rect();
-
-                    let mut draw_line = |from: Point, to: Point| {
-                        clipping_frame.stroke(
-                            &Path::line(from, to),
-                            Stroke {
-                                style: Style::Solid(Color::from_rgb8(0, 208, 255)),
-                                width: 1.0,
-                                ..Default::default()
-                            },
-                        );
-                    };
-
-                    let snap_point = self.snap_point;
-
-                    if snap_point.x >= 0. {
-                        let x = rect.x + rect.width * snap_point.x;
-                        let from = Point { x, y: 0. };
-                        let to = Point {
-                            x,
-                            y: bounds.height,
+                match *state {
+                    Interaction::Dragging { .. } | Interaction::Resizing { .. } => {
+                        let rect = &self.layers[selected_layer].handler.get_rect();
+                        let mut draw_line = |from: Point, to: Point| {
+                            clipping_frame.stroke(
+                                &Path::line(from, to),
+                                Stroke {
+                                    style: Style::Solid(Color::from_rgb8(0, 208, 255)),
+                                    width: 1.0,
+                                    ..Default::default()
+                                },
+                            );
                         };
+                        let snap_point = self.snap_point;
+                        if snap_point.x >= 0. {
+                            let x = rect.x + rect.width * snap_point.x;
+                            let from = Point { x, y: 0. };
+                            let to = Point {
+                                x,
+                                y: bounds.height,
+                            };
 
-                        draw_line(from, to);
+                            draw_line(from, to);
+                        }
+                        if snap_point.y >= 0. {
+                            let y = rect.y + rect.height * snap_point.y;
+                            let from = Point { x: 0., y };
+                            let to = Point { x: bounds.width, y };
+                            draw_line(from, to);
+                        }
                     }
-                    if snap_point.y >= 0. {
-                        let y = rect.y + rect.height * snap_point.y;
-                        let from = Point { x: 0., y };
-                        let to = Point { x: bounds.width, y };
-                        draw_line(from, to);
-                    }
+                    _ => (),
                 }
             }
         });
