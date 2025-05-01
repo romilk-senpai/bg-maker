@@ -138,13 +138,14 @@ impl MakerCanvas {
         };
 
         let snap = true;
-        let mut bank = self.ignored_delta_bank;
-        let mut delta = delta;
 
         if !snap {
             let layer = &mut self.layers[selected_layer];
             layer.resize_by(delta, pivot, preserve_aspect);
         } else {
+            let mut bank = self.ignored_delta_bank;
+            let mut delta = delta;
+
             let bounds = Rectangle {
                 x: 0.,
                 y: 0.,
@@ -166,11 +167,16 @@ impl MakerCanvas {
             let (current_layer, after) = rest.split_first_mut().unwrap();
             let other_layers = before.iter().chain(after.iter());
 
-            let (ignored_delta, snap_point) =
-                current_layer.move_by_snap(delta, &other_layers.collect::<Vec<_>>(), &bounds);
+            let (ignored_delta, snap_point) = current_layer.resize_by_snap(
+                delta,
+                pivot,
+                preserve_aspect,
+                &other_layers.collect::<Vec<_>>(),
+                &bounds,
+            );
 
             if snap_point.x < 0. && snap_point.y < 0. {
-                current_layer.move_by(bank);
+                current_layer.resize_by(bank, pivot, preserve_aspect);
                 self.ignored_delta_bank = Point::ORIGIN;
                 bank = Point::ORIGIN;
             }
@@ -339,6 +345,7 @@ impl canvas::Program<Message> for MakerCanvas {
                     let layer_rect = self.layers[selected_layer].handler.get_rect();
                     if let Some(pivot) = position_to_pivot(in_cursor_position, &layer_rect, 4.) {
                         *state = Interaction::Resizing { position, pivot };
+                        return Some(canvas::Action::publish(Message::StartDrag));
                     }
                 }
 
@@ -351,7 +358,7 @@ impl canvas::Program<Message> for MakerCanvas {
                     if let Some(selected_layer) = self.selected_layer {
                         if selected_layer == index {
                             *state = Interaction::Dragging { position };
-                            return Some(canvas::Action::publish(Message::StartMoving));
+                            return Some(canvas::Action::publish(Message::StartDrag));
                         }
                     }
 

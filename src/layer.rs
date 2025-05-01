@@ -73,10 +73,6 @@ impl Layer {
         let center_y = rect.y + rect.height * 0.5;
 
         for &layer in layers {
-            if std::ptr::eq(layer, self) {
-                continue;
-            }
-
             let other = layer.handler.get_rect();
 
             let other_center_x = other.x + other.width * 0.5;
@@ -182,8 +178,8 @@ impl Layer {
             new_height = height + effective_delta_y
         };
 
-        new_width = new_width.max(1.0);
-        new_height = new_height.max(1.0);
+        new_width = new_width.max(16.);
+        new_height = new_height.max(16.);
 
         rect.x -= (new_width - width) * pivot.x;
         rect.y -= (new_height - height) * pivot.y;
@@ -197,85 +193,176 @@ impl Layer {
     pub fn resize_by_snap(
         &mut self,
         delta: Point,
+        pivot: Point,
+        preserve_aspect: bool,
         layers: &Vec<&Layer>,
         bounds: &Rectangle,
     ) -> (Point, Point) {
         let mut rect = self.handler.get_rect();
+        let width = rect.width;
+        let height = rect.height;
+        let orig_x = rect.x;
+        let orig_y = rect.y;
+        let aspect = width / height;
 
-        let orig_width = rect.width;
-        let orig_height = rect.height;
+        let effective_delta_x = delta.x * (1.0 - 2.0 * pivot.x);
+        let effective_delta_y = delta.y * (1.0 - 2.0 * pivot.y);
 
-        rect.width += delta.x;
-        rect.height += delta.y;
+        let mut new_width: f32;
+        let mut new_height: f32;
+
+        if preserve_aspect {
+            if pivot.x == 0.0 || pivot.x == 1.0 {
+                new_width = width + effective_delta_x;
+                new_height = new_width / aspect;
+            } else if pivot.y == 0.0 || pivot.y == 1.0 {
+                new_height = height + effective_delta_y;
+                new_width = new_height * aspect;
+            } else {
+                if effective_delta_x.abs() > effective_delta_y.abs() {
+                    new_width = width + effective_delta_x;
+                    new_height = new_width / aspect;
+                } else {
+                    new_height = height + effective_delta_y;
+                    new_width = new_height * aspect;
+                }
+            }
+        } else {
+            new_width = width + effective_delta_x;
+            new_height = height + effective_delta_y
+        };
+
+        new_width = new_width.max(16.);
+        new_height = new_height.max(16.);
+
+        let mut new_x = rect.x - (new_width - width) * pivot.x;
+        let mut new_y = rect.y - (new_height - height) * pivot.y;
 
         let mut snap_point = Point::new(-1., -1.);
-        const SNAP_DISTANCE: f32 = 3.0;
 
-        let right = rect.x + rect.width;
-        let bottom = rect.y + rect.height;
+        const SNAP_DISTANCE: f32 = 10.0;
 
-        let bounds_right = bounds.x + bounds.width;
-        let bounds_bottom = bounds.y + bounds.height;
-
-        if (right - bounds_right).abs() < SNAP_DISTANCE {
-            rect.width = bounds_right - rect.x;
+        let dx = new_x - bounds.x;
+        if dx.abs() < SNAP_DISTANCE {
+            new_x = bounds.x;
+            new_width += dx;
+            snap_point.x = 0.;
+        }
+        let dy = new_y - bounds.y;
+        if dy.abs() < SNAP_DISTANCE {
+            new_y = bounds.y;
+            new_height += dy;
+            snap_point.y = 0.;
+        }
+        let dx = (new_x + new_width) - (bounds.x + bounds.width);
+        if dx.abs() < SNAP_DISTANCE {
+            new_width -= dx;
             snap_point.x = 1.0;
         }
-        if (bottom - bounds_bottom).abs() < SNAP_DISTANCE {
-            rect.height = bounds_bottom - rect.y;
+        let dy = (new_y + new_height) - (bounds.y + bounds.height);
+        if dy.abs() < SNAP_DISTANCE {
+            new_height -= dy;
             snap_point.y = 1.0;
         }
 
         for &layer in layers {
-            if std::ptr::eq(layer, self) {
-                continue;
-            }
-
             let other = layer.handler.get_rect();
 
             let other_left = other.x;
             let other_right = other.x + other.width;
             let other_top = other.y;
             let other_bottom = other.y + other.height;
-
-            if (rect.x + rect.width - other_left).abs() < SNAP_DISTANCE {
-                rect.width = other_left - rect.x;
-                snap_point.x = 1.0;
-            } else if (rect.x + rect.width - other_right).abs() < SNAP_DISTANCE {
-                rect.width = other_right - rect.x;
-                snap_point.x = 1.0;
-            }
-
-            if (rect.y + rect.height - other_top).abs() < SNAP_DISTANCE {
-                rect.height = other_top - rect.y;
-                snap_point.y = 1.0;
-            } else if (rect.y + rect.height - other_bottom).abs() < SNAP_DISTANCE {
-                rect.height = other_bottom - rect.y;
-                snap_point.y = 1.0;
-            }
-
-            let this_center_x = rect.x + rect.width;
-            let this_center_y = rect.y + rect.height;
-
             let other_center_x = other.x + other.width * 0.5;
             let other_center_y = other.y + other.height * 0.5;
 
-            if (this_center_x - other_center_x).abs() < SNAP_DISTANCE {
-                rect.width = other_center_x - rect.x;
+            let left = new_x;
+            let right = new_x + new_width;
+            let top = new_y;
+            let bottom = new_y + new_height;
+            let center_x = new_x + new_width * 0.5;
+            let center_y = new_y + new_height * 0.5;
+
+            let dx = left - other_right;
+            if dx.abs() < SNAP_DISTANCE {
+                new_x = other_right;
+                new_width += dx;
+                snap_point.x = 0.;
+            }
+            let dx = left - other_left;
+            if dx.abs() < SNAP_DISTANCE {
+                new_x = other_left;
+                new_width += dx;
+                snap_point.x = 0.;
+            }
+            let dx = right - other_left;
+            if dx.abs() < SNAP_DISTANCE {
+                new_width -= dx;
+                snap_point.x = 1.0;
+            }
+            let dx = right - other_right;
+            if dx.abs() < SNAP_DISTANCE {
+                new_width -= dx;
+                snap_point.x = 1.0;
+            }
+            let dx = center_x - other_center_x;
+            if dx.abs() < SNAP_DISTANCE {
+                new_x -= dx;
                 snap_point.x = 0.5;
             }
 
-            if (this_center_y - other_center_y).abs() < SNAP_DISTANCE {
-                rect.height = other_center_y - rect.y;
+            let dy = top - other_bottom;
+            if dy.abs() < SNAP_DISTANCE {
+                new_y = other_bottom;
+                new_height += dy;
+                snap_point.y = 0.;
+            }
+            let dy = top - other_top;
+            if dy.abs() < SNAP_DISTANCE {
+                new_y = other_top;
+                new_height += dy;
+                snap_point.y = 0.;
+            }
+            let dy = bottom - other_top;
+            if dy.abs() < SNAP_DISTANCE {
+                new_height -= dy;
+                snap_point.y = 1.0;
+            }
+            let dy = bottom - other_bottom;
+            if dy.abs() < SNAP_DISTANCE {
+                new_height -= dy;
+                snap_point.y = 1.0;
+            }
+            let dy = center_y - other_center_y;
+            if dy.abs() < SNAP_DISTANCE {
+                new_y -= dy;
                 snap_point.y = 0.5;
             }
         }
 
+        rect.x = new_x;
+        rect.y = new_y;
+        rect.width = new_width;
+        rect.height = new_height;
+
         self.handler.set_rect(rect);
 
-        (
-            Point::new(rect.width - orig_width, rect.height - orig_height),
-            snap_point,
-        )
+        // (10 - 10) + (20 - 10) = 10
+        // pivot (0.5 0)
+
+        let weight_x = (pivot.x - 0.5).abs() * 2.0;
+        let weight_y = (pivot.y - 0.5).abs() * 2.0;
+
+        let actual_delta_x = (orig_x - new_x) + (new_width - width);
+        let actual_delta_y = (orig_y - new_y) + (new_height - height);
+
+        // 10 - 10 = 0
+        let ignored_delta = Point::new(
+            (delta.x - actual_delta_x) * weight_x,
+            (delta.y - actual_delta_y) * weight_y,
+        );
+
+        println!("{} {}", ignored_delta.x, ignored_delta.y);
+
+        (ignored_delta, snap_point)
     }
 }
