@@ -339,6 +339,24 @@ impl Layer {
             }
         }
 
+        if preserve_aspect {
+            if pivot.x == 0.0 || pivot.x == 1.0 {
+                new_width = width + effective_delta_x;
+                new_height = new_width / aspect;
+            } else if pivot.y == 0.0 || pivot.y == 1.0 {
+                new_height = height + effective_delta_y;
+                new_width = new_height * aspect;
+            } else {
+                if effective_delta_x.abs() > effective_delta_y.abs() {
+                    new_width = width + effective_delta_x;
+                    new_height = new_width / aspect;
+                } else {
+                    new_height = height + effective_delta_y;
+                    new_width = new_height * aspect;
+                }
+            }
+        }
+
         rect.x = new_x;
         rect.y = new_y;
         rect.width = new_width;
@@ -349,8 +367,8 @@ impl Layer {
         let weight_x = (pivot.x - 0.5).abs() * 2.0;
         let weight_y = (pivot.y - 0.5).abs() * 2.0;
 
-        let actual_delta_x = (rect.x - orig_x) + (rect.width - width) * (1.0 - pivot.x);
-        let actual_delta_y = (rect.y - orig_y) + (rect.height - height) * (1.0 - pivot.y);
+        let actual_delta_x = (new_x - orig_x) + (rect.width - width) * (1.0 - pivot.x);
+        let actual_delta_y = (new_y - orig_y) + (rect.height - height) * (1.0 - pivot.y);
 
         let mut ignored_x = (delta.x - actual_delta_x) * weight_x;
         let mut ignored_y = (delta.y - actual_delta_y) * weight_y;
@@ -368,6 +386,7 @@ impl Layer {
                 }
             }
         }
+
         let ignored_delta = Point::new(ignored_x, ignored_y);
 
         println!("{} {}", ignored_delta.x, ignored_delta.y);

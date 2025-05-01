@@ -239,8 +239,8 @@ impl MakerCanvas {
                 let bank = self.ignored_delta_bank;
 
                 if bank.x.abs() > 0. || bank.y.abs() > 0. {
-                    let layer = &mut self.layers[selected_layer];
-                    layer.move_by(bank);
+                    // let layer = &mut self.layers[selected_layer];
+                    // layer.move_by(bank);
                     self.ignored_delta_bank = Point::ORIGIN;
                 }
             }
