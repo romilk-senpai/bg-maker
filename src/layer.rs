@@ -272,15 +272,11 @@ impl Layer {
             let other_right = other.x + other.width;
             let other_top = other.y;
             let other_bottom = other.y + other.height;
-            let other_center_x = other.x + other.width * 0.5;
-            let other_center_y = other.y + other.height * 0.5;
 
             let left = new_x;
             let right = new_x + new_width;
             let top = new_y;
             let bottom = new_y + new_height;
-            let center_x = new_x + new_width * 0.5;
-            let center_y = new_y + new_height * 0.5;
 
             let dx = left - other_right;
             if dx.abs() < SNAP_DISTANCE {
@@ -304,11 +300,6 @@ impl Layer {
                 new_width -= dx;
                 snap_point.x = 1.0;
             }
-            let dx = center_x - other_center_x;
-            if dx.abs() < SNAP_DISTANCE {
-                new_x -= dx;
-                snap_point.x = 0.5;
-            }
 
             let dy = top - other_bottom;
             if dy.abs() < SNAP_DISTANCE {
@@ -331,11 +322,6 @@ impl Layer {
             if dy.abs() < SNAP_DISTANCE {
                 new_height -= dy;
                 snap_point.y = 1.0;
-            }
-            let dy = center_y - other_center_y;
-            if dy.abs() < SNAP_DISTANCE {
-                new_y -= dy;
-                snap_point.y = 0.5;
             }
         }
 

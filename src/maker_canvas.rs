@@ -234,19 +234,8 @@ impl MakerCanvas {
     }
 
     pub fn on_left_button_released(&mut self) {
-        if let Some(selected_layer) = self.selected_layer {
-            if self.snap_point.x < 0. && self.snap_point.y < 0. {
-                let bank = self.ignored_delta_bank;
-
-                if bank.x.abs() > 0. || bank.y.abs() > 0. {
-                    // let layer = &mut self.layers[selected_layer];
-                    // layer.move_by(bank);
-                    self.ignored_delta_bank = Point::ORIGIN;
-                }
-            }
-
-            self.snap_point = Point::new(-1., -1.);
-        }
+        self.ignored_delta_bank = Point::ORIGIN;
+        self.snap_point = Point::new(-1., -1.);
     }
 }
 
