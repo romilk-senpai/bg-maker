@@ -30,7 +30,7 @@ pub mod wallpaper {
 }
 
 #[cfg(unix)]
-mod wallpaper {
+pub mod wallpaper {
     pub fn set_wallpaper(image_path: &str) -> Result<(), Box<dyn std::error::Error>> {
         todo!();
     }
