@@ -34,6 +34,8 @@ pub enum Message {
     Undo,
     Redo,
     LeftButtonReleased,
+    LayerUp(Id),
+    LayerDown(Id),
 }
 
 pub struct BgMaker {
@@ -91,8 +93,7 @@ impl BgMaker {
                 self.canvas.move_selection(delta, snap);
             }
             Message::ResizeSelection(delta, point, preserve_aspect) => {
-                self.canvas
-                    .resize_selection(delta, point, preserve_aspect);
+                self.canvas.resize_selection(delta, point, preserve_aspect);
             }
             Message::DeselectLayers => {
                 self.canvas.deselect_layers();
@@ -128,15 +129,20 @@ impl BgMaker {
 
                 return Task::perform(task, |_| Message::None);
             }
-            Message::SaveApplyPathSelected(None) => return Task::none(),
             Message::ShiftHeld(held) => {
                 self.canvas.set_shift_state(held);
             }
-            Message::LeftButtonReleased=>{
+            Message::LeftButtonReleased => {
                 self.canvas.on_left_button_released();
             }
             Message::Undo => todo!(),
             Message::Redo => todo!(),
+            Message::LayerUp(id) => {
+                self.canvas.layer_up(id);
+            }
+            Message::LayerDown(id) => {
+                self.canvas.layer_down(id);
+            }
             _ => return Task::none(),
         }
 
@@ -169,9 +175,11 @@ impl BgMaker {
                         container(
                             row![
                                 layer.handler.get_preview(),
-                                text(layer.get_name()).width(Length::Fill),
+                                text(layer.get_name())
+                                    .width(Length::Fill)
+                                    .wrapping(text::Wrapping::Glyph),
                                 button(
-                                    container(text("x").size(16))
+                                    container(text("x").size(16).wrapping(text::Wrapping::None))
                                         .align_x(Alignment::Center)
                                         .align_y(Alignment::Center)
                                 )
@@ -179,6 +187,25 @@ impl BgMaker {
                                 .height(24)
                                 .width(24)
                                 .padding(0),
+                                column![
+                                    button(
+                                        container(text("U").size(12).wrapping(text::Wrapping::None))
+                                            .align_x(Alignment::Center)
+                                            .align_y(Alignment::Center)
+                                    )
+                                    .height(10)
+                                    .on_press(Message::LayerUp(layer.id)),
+                                    button(
+                                        container(text("D").size(12).wrapping(text::Wrapping::Word))
+                                            .align_x(Alignment::Center)
+                                            .align_y(Alignment::Center)
+                                    )
+                                    .height(10)
+                                    .on_press(Message::LayerDown(layer.id))
+                                ]
+                                .spacing(4)
+                                .width(24)
+                                .height(24)
                             ]
                             .align_y(Alignment::Center)
                             .padding(4)

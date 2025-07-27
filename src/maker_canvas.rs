@@ -69,6 +69,22 @@ impl MakerCanvas {
         }
     }
 
+    pub fn layer_up(&mut self, id: Id) {
+        if let Some(index) = self.layers.iter().position(|layer| layer.id == id) {
+            if index > 0 {
+                self.layers.swap(index, index - 1);
+            }
+        }
+    }
+
+    pub fn layer_down(&mut self, id: Id) {
+        if let Some(index) = self.layers.iter().position(|layer| layer.id == id) {
+            if index + 1 < self.layers.len() {
+                self.layers.swap(index, index + 1);
+            }
+        }
+    }
+
     pub fn select_layer(&mut self, index: usize) {
         if let Some(selected_layer) = self.selected_layer {
             self.layers[selected_layer].on_deselect();

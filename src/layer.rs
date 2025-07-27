@@ -375,8 +375,6 @@ impl Layer {
 
         let ignored_delta = Point::new(ignored_x, ignored_y);
 
-        println!("{} {}", ignored_delta.x, ignored_delta.y);
-
         (ignored_delta, snap_point)
     }
 }
